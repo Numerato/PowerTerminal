@@ -5,7 +5,6 @@
     "Host": "dockerhome.local",
     "Username": "Geertm",
     "Port": 22,
-    "Password": null,
     "PrivateKeyPath": null,
     "LastConnected": null
   }

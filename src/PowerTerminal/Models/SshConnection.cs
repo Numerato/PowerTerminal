@@ -9,7 +9,6 @@ namespace PowerTerminal.Models
         public string Host { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public int Port { get; set; } = 22;
-        public string? Password { get; set; }
         public string? PrivateKeyPath { get; set; }
         public string? LastConnected { get; set; }
 

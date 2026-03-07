@@ -33,6 +33,15 @@ namespace PowerTerminal.Services
         /// <summary>Raised when the connection is lost.</summary>
         public event Action<Exception?>? Disconnected;
 
+        /// <summary>
+        /// Optional callback invoked during keyboard-interactive authentication.
+        /// Receives the prompt text (e.g. "Password: ") and returns the user's response.
+        /// Must be set before <see cref="ConnectAsync"/> is called when no private key is configured;
+        /// if left null the keyboard-interactive method is not added and connection will fail on
+        /// password-protected servers.
+        /// </summary>
+        public Func<string, string>? PasswordPrompt { get; set; }
+
         public async Task ConnectAsync(SshConnection connection)
         {
             Disconnect();
@@ -50,15 +59,22 @@ namespace PowerTerminal.Services
                         connection.Username,
                         new PrivateKeyFile(connection.PrivateKeyPath)));
                 }
-
-                if (!string.IsNullOrWhiteSpace(connection.Password))
+                else if (PasswordPrompt != null)
                 {
-                    authMethods.Add(new PasswordAuthenticationMethod(
-                        connection.Username, connection.Password));
+                    // No private key: use keyboard-interactive so the server can prompt for a password.
+                    var kia = new KeyboardInteractiveAuthenticationMethod(connection.Username);
+                    kia.AuthenticationPrompt += (_, e) =>
+                    {
+                        foreach (var prompt in e.Prompts)
+                            prompt.Response = PasswordPrompt(prompt.Request.TrimEnd());
+                    };
+                    authMethods.Add(kia);
                 }
-
-                if (authMethods.Count == 0)
+                else
+                {
+                    // No key and no prompt handler: fall back to none-auth for key-free servers.
                     authMethods.Add(new NoneAuthenticationMethod(connection.Username));
+                }
 
                 var connInfo = new ConnectionInfo(
                     connection.Host,

@@ -93,6 +93,17 @@ namespace PowerTerminal.ViewModels
             {
                 _ssh?.Dispose();
                 _ssh = new SshService(_log);
+                _ssh.PasswordPrompt = prompt =>
+                {
+                    string password = string.Empty;
+                    Application.Current?.Dispatcher.Invoke(() =>
+                    {
+                        var dlg = new PowerTerminal.Views.SshPasswordPromptWindow(Connection.Username ?? string.Empty, prompt);
+                        if (dlg.ShowDialog() == true)
+                            password = dlg.Password;
+                    });
+                    return password;
+                };
                 _ssh.DataReceived  += data => Application.Current?.Dispatcher.Invoke(() => TerminalDataReceived?.Invoke(data));
                 _ssh.Disconnected  += ex =>
                 {

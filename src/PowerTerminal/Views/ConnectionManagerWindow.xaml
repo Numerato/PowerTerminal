@@ -75,7 +75,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"/>
@@ -98,15 +97,11 @@
                 <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,6"
                          Text="{Binding Editing.Port, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <Label Grid.Row="4" Grid.Column="0" Content="Password:"/>
-                <PasswordBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,6"
-                             x:Name="PasswordInput"
-                             PasswordChanged="PasswordInput_PasswordChanged"/>
-
-                <Label Grid.Row="5" Grid.Column="0" Content="Private Key:"/>
-                <Grid Grid.Row="5" Grid.Column="1" Margin="0,0,0,6">
+                <Label Grid.Row="4" Grid.Column="0" Content="Private Key:"/>
+                <Grid Grid.Row="4" Grid.Column="1" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox Grid.Column="0"
@@ -114,11 +109,15 @@
                              Margin="0,0,4,0"/>
                     <Button Grid.Column="1" Content="Browse"
                             Style="{StaticResource FlatButton}"
-                            Click="BrowseKey_Click"/>
+                            Click="BrowseKey_Click"
+                            Margin="0,0,4,0"/>
+                    <Button Grid.Column="2" Content="Clear"
+                            Style="{StaticResource FlatButton}"
+                            Click="ClearKey_Click"/>
                 </Grid>
 
-                <TextBlock Grid.Row="6" Grid.ColumnSpan="2"
-                           Text="Leave Password empty to use key-based auth only."
+                <TextBlock Grid.Row="5" Grid.ColumnSpan="2"
+                           Text="Leave Private Key empty to authenticate with a password (you will be prompted on connect)."
                            Foreground="{StaticResource ForegroundDimBrush}"
                            FontSize="11"
                            TextWrapping="Wrap"/>

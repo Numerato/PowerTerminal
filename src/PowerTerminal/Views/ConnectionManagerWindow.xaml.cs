@@ -14,12 +14,6 @@ namespace PowerTerminal.Views
 
         private ConnectionManagerViewModel Vm => (ConnectionManagerViewModel)DataContext;
 
-        private void PasswordInput_PasswordChanged(object sender, RoutedEventArgs e)
-        {
-            if (Vm.Editing != null)
-                Vm.Editing.Password = PasswordInput.Password;
-        }
-
         private void BrowseKey_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog
@@ -29,6 +23,12 @@ namespace PowerTerminal.Views
             };
             if (dlg.ShowDialog() == true && Vm.Editing != null)
                 Vm.Editing.PrivateKeyPath = dlg.FileName;
+        }
+
+        private void ClearKey_Click(object sender, RoutedEventArgs e)
+        {
+            if (Vm.Editing != null)
+                Vm.Editing.PrivateKeyPath = null;
         }
 
         private void Connect_Click(object sender, RoutedEventArgs e)
