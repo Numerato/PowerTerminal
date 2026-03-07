@@ -68,12 +68,88 @@ The app ships with:
 ## Requirements
 
 - **Windows 10/11** (WPF, Windows-only)
-- **.NET 8 Runtime** – [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **.NET 8 SDK** – [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
 - **Cascadia Code** font (optional but recommended) – included with Windows Terminal
 
 ---
 
-## Build
+## Opening in Visual Studio 2022
+
+### Prerequisites
+1. Install **Visual Studio 2022** (version 17.x) — [Download](https://visualstudio.microsoft.com/downloads/)
+2. During installation (or via the Visual Studio Installer → **Modify**), enable the workload:
+   - ✅ **.NET desktop development**
+   
+   This workload includes the WPF designer, C# compiler, and all required SDK components.
+
+3. Ensure **.NET 8 SDK** is installed — the **.NET desktop development** workload typically installs it automatically. If needed, you can verify or add it manually under **Individual components → .NET SDK 8.x** in the Visual Studio Installer.
+
+### Opening the Solution
+1. Clone the repository:
+   ```
+   git clone https://github.com/Numerato/PowerTerminal.git
+   ```
+2. Open Visual Studio 2022.
+3. Choose **File → Open → Project/Solution…**
+4. Browse to the repository root and select **`PowerTerminal.sln`**
+   > ⚠️ Use **`PowerTerminal.sln`** (not `PowerTerminal.slnx`). The `.slnx` format requires VS 2022 17.12+ preview; the `.sln` works with all VS 2022 versions.
+
+5. Visual Studio will restore NuGet packages automatically. If it doesn't, right-click the solution in **Solution Explorer** and choose **Restore NuGet Packages**.
+
+### Running and Debugging
+- Press **F5** to build and run with the debugger attached.
+- Press **Ctrl+F5** to run without the debugger.
+- The startup project is `PowerTerminal` — it should be **bold** in Solution Explorer. If not, right-click it and choose **Set as Startup Project**.
+- Set breakpoints by clicking in the gutter (grey bar on the left of each line). The debugger will pause there.
+- The **XAML Hot Reload** panel lets you edit XAML while the app is running.
+
+### Troubleshooting Visual Studio
+| Problem | Fix |
+|---------|-----|
+| "The project doesn't know how to run the profile…" | Right-click project → **Properties** → **Debug** → ensure the profile uses **Project** as launch type |
+| NuGet packages not restoring | **Tools → NuGet Package Manager → Package Manager Console** → `Update-Package -reinstall` |
+| WPF designer shows blank | Ensure **.NET desktop development** workload is installed; try **Build → Rebuild Solution** |
+| `net8.0-windows` target error | Install **.NET 8 SDK** from https://dotnet.microsoft.com/download |
+
+---
+
+## Opening in JetBrains Rider
+
+### Prerequisites
+1. Install **JetBrains Rider** (2023.3 or newer recommended) — [Download](https://www.jetbrains.com/rider/)
+2. Rider ships with its own .NET SDK management; no separate installation needed. However, having the **[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** installed system-wide is recommended.
+3. On Windows, WPF support is built in — no additional plugins required.
+
+### Opening the Solution
+1. Clone the repository (if you haven't already):
+   ```
+   git clone https://github.com/Numerato/PowerTerminal.git
+   ```
+2. Launch Rider.
+3. On the **Welcome** screen click **Open** (or **File → Open…**).
+4. Browse to the repository root and select either:
+   - **`PowerTerminal.sln`** — works with all Rider versions, recommended
+   - **`PowerTerminal.slnx`** — works with Rider 2024.1+
+5. Rider will index the project and restore NuGet packages automatically.
+
+### Running and Debugging
+- Click the **▶ Run** button (top toolbar) or press **Shift+F10** to run.
+- Click the **🐛 Debug** button or press **Shift+F9** to run with the debugger.
+- The run configuration `PowerTerminal` is created automatically from the `.csproj`.
+- Set breakpoints by clicking in the gutter. Rider's debugger supports step-in, step-over, watch windows, and inline variable values.
+- The **XAML Preview** panel (View → Tool Windows → XAML Preview) shows a live design-time preview.
+
+### Troubleshooting Rider
+| Problem | Fix |
+|---------|-----|
+| "SDK not found" | **File → Settings → Build, Execution, Deployment → Toolset and Build** — set the .NET CLI path to your installed SDK |
+| NuGet packages not restoring | Right-click the solution → **Restore NuGet Packages** |
+| XAML preview blank | Rider's XAML preview requires Windows; ensure you are on Windows and the project has built at least once |
+| Build error `net8.0-windows` | Install [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and restart Rider |
+
+---
+
+## Build (Command Line)
 
 ```powershell
 # Clone the repository
@@ -81,22 +157,28 @@ git clone https://github.com/Numerato/PowerTerminal.git
 cd PowerTerminal
 
 # Restore packages
-dotnet restore src/PowerTerminal/PowerTerminal.csproj
+dotnet restore PowerTerminal.sln
 
 # Build (Debug)
-dotnet build src/PowerTerminal/PowerTerminal.csproj
+dotnet build PowerTerminal.sln
 
-# Publish (Release, self-contained)
-dotnet publish src/PowerTerminal/PowerTerminal.csproj -c Release -r win-x64 --self-contained true -o ./publish
+# Run directly
+dotnet run --project src/PowerTerminal/PowerTerminal.csproj
+
+# Publish (Release, framework-dependent — requires .NET 8 on target machine)
+dotnet publish src/PowerTerminal/PowerTerminal.csproj -c Release -r win-x64 -o ./publish
+
+# Publish (Release, self-contained — no .NET required on target machine)
+dotnet publish src/PowerTerminal/PowerTerminal.csproj -c Release -r win-x64 --self-contained true -o ./publish-standalone
 ```
 
-The published output in `./publish` can be run directly on any Windows 10/11 machine.
+The published output in `./publish` or `./publish-standalone` can be run directly on any Windows 10/11 machine.
 
 ---
 
 ## Quick Start
 
-1. Build and run the application
+1. Build and run the application (F5 in VS/Rider, or `dotnet run`)
 2. Click **Connections** to manage SSH connections
 3. Add your server details (host, username, port, password or private key path)
 4. Click **Connect** – a new terminal tab opens and connects automatically

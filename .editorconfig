@@ -1,0 +1,75 @@
+# EditorConfig – consistent code style for Visual Studio and Rider
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset                  = utf-8
+end_of_line              = crlf
+indent_style             = space
+indent_size              = 4
+tab_width                = 4
+trim_trailing_whitespace = true
+insert_final_newline     = true
+
+[*.{xml,xaml,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ── C# code style ────────────────────────────────────────────────────────────
+[*.cs]
+# Namespace declarations
+csharp_style_namespace_declarations                          = file_scoped:suggestion
+
+# Using directives
+csharp_using_directive_placement                            = outside_namespace:silent
+
+# var preferences
+csharp_style_var_for_built_in_types                         = false:suggestion
+csharp_style_var_when_type_is_apparent                      = true:suggestion
+csharp_style_var_elsewhere                                  = false:suggestion
+
+# Braces
+csharp_prefer_braces                                        = true:suggestion
+
+# Expression body
+csharp_style_expression_bodied_methods                      = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties                   = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors                 = false:suggestion
+
+# Null checking
+csharp_style_conditional_delegate_call                      = true:suggestion
+dotnet_style_null_propagation                               = true:suggestion
+dotnet_style_coalesce_expression                            = true:suggestion
+
+# Naming conventions
+dotnet_naming_rule.private_fields_underscore.symbols        = private_fields
+dotnet_naming_rule.private_fields_underscore.style          = underscore_prefix
+dotnet_naming_rule.private_fields_underscore.severity       = suggestion
+
+dotnet_naming_symbols.private_fields.applicable_kinds       = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_prefix.capitalization        = camel_case
+dotnet_naming_style.underscore_prefix.required_prefix       = _
+
+# New-line preferences
+csharp_new_line_before_open_brace                           = all
+csharp_new_line_before_else                                 = true
+csharp_new_line_before_catch                                = true
+csharp_new_line_before_finally                              = true
+
+# Space preferences
+csharp_space_after_cast                                     = false
+csharp_space_after_keywords_in_control_flow_statements      = true
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_parentheses                            = false
+
+# Sorting
+dotnet_sort_system_directives_first                         = true
