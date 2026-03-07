@@ -26,6 +26,13 @@ namespace PowerTerminal.ViewModels
         private readonly StringBuilder _passwordBuffer = new();
         private SemaphoreSlim _passwordInputReady = new(0, 1);
 
+        /// <summary>
+        /// When true the tab view will call <see cref="ConnectAsync"/> as soon as it loads.
+        /// Set by <c>MainViewModel.ConnectToConnection</c>; cleared immediately in OnLoaded
+        /// so that tab-switch view-recreations do not trigger a second connection attempt.
+        /// </summary>
+        public bool AutoConnectOnLoad { get; set; }
+
         public TerminalTabViewModel(LoggingService log)
         {
             _log = log;
