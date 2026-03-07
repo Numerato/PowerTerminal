@@ -18,12 +18,16 @@ namespace PowerTerminal.Views
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (_vm != null)
+            {
                 _vm.TerminalDataReceived -= OnTerminalData;
+                _vm.LocalOutput          -= OnTerminalData;
+            }
 
             _vm = DataContext as TerminalTabViewModel;
             if (_vm != null)
             {
                 _vm.TerminalDataReceived += OnTerminalData;
+                _vm.LocalOutput          += OnTerminalData;
                 Terminal.UserInput += s => _vm.SendData(s);
             }
         }

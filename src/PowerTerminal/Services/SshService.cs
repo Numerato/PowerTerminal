@@ -66,7 +66,7 @@ namespace PowerTerminal.Services
                     kia.AuthenticationPrompt += (_, e) =>
                     {
                         foreach (var prompt in e.Prompts)
-                            prompt.Response = PasswordPrompt(prompt.Request.TrimEnd());
+                            prompt.Response = PasswordPrompt(prompt.Request);
                     };
                     authMethods.Add(kia);
                 }
