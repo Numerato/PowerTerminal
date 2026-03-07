@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
@@ -35,6 +36,19 @@ namespace PowerTerminal.ViewModels
         public ICommand CancelCommand            { get; }
 
         public ObservableCollection<WikiSection> Sections { get; } = new();
+
+        /// <summary>
+        /// Template variables populated from the active terminal when the editor opens.
+        /// Displayed in a reference list so the user knows what syntax to type.
+        /// </summary>
+        public ObservableCollection<VariableItem> AvailableVariables { get; } = new();
+
+        public void SetVariables(IEnumerable<VariableItem> variables)
+        {
+            AvailableVariables.Clear();
+            foreach (var v in variables)
+                AvailableVariables.Add(v);
+        }
 
         public WikiEntry Entry
         {

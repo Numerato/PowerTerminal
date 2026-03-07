@@ -134,6 +134,7 @@ namespace PowerTerminal.ViewModels
         private void OpenWikiEditorForNew()
         {
             WikiEditor.LoadNew();
+            PopulateEditorVariables();
             OpenWikiEditorRequested?.Invoke(WikiEditor);
         }
 
@@ -141,7 +142,29 @@ namespace PowerTerminal.ViewModels
         {
             if (Wiki.SelectedEntry == null) return;
             WikiEditor.LoadExisting(Wiki.SelectedEntry);
+            PopulateEditorVariables();
             OpenWikiEditorRequested?.Invoke(WikiEditor);
+        }
+
+        private void PopulateEditorVariables()
+        {
+            var t = ActiveTerminalTab;
+            WikiEditor.SetVariables(new[]
+            {
+                new Models.VariableItem { Name = "$currentdirectory$", Value = t?.CurrentDirectory ?? string.Empty },
+                new Models.VariableItem { Name = "$operatingsystem$",  Value = t?.OperatingSystem  ?? string.Empty },
+                new Models.VariableItem { Name = "$version$",          Value = t?.OsVersion        ?? string.Empty },
+                new Models.VariableItem { Name = "$homefolder$",       Value = t?.HomeFolder       ?? string.Empty },
+                new Models.VariableItem { Name = "$hardware$",         Value = t?.Hardware         ?? string.Empty },
+                new Models.VariableItem { Name = "$disksizes$",        Value = t?.DiskSizes        ?? string.Empty },
+                new Models.VariableItem { Name = "$ipaddress$",        Value = t?.IpAddress        ?? string.Empty },
+                new Models.VariableItem { Name = "$hostname$",         Value = t?.Hostname         ?? string.Empty },
+                new Models.VariableItem { Name = "$cpu$",              Value = t?.CpuInfo          ?? string.Empty },
+                new Models.VariableItem { Name = "$memory$",           Value = t?.TotalMemory      ?? string.Empty },
+                new Models.VariableItem { Name = "$username$",         Value = t?.Username         ?? string.Empty },
+                new Models.VariableItem { Name = "$uptime$",           Value = t?.Uptime           ?? string.Empty },
+                new Models.VariableItem { Name = "$kernelversion$",    Value = t?.KernelVersion    ?? string.Empty },
+            });
         }
 
         private void DeleteWiki()

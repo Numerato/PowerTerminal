@@ -55,9 +55,9 @@
         <!-- Sections editor -->
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*" MinWidth="280"/>
+                <ColumnDefinition Width="4"/>
+                <ColumnDefinition Width="*" MinWidth="200"/>
             </Grid.ColumnDefinitions>
 
             <!-- Section content editor -->
@@ -81,24 +81,35 @@
                          FontFamily="Cascadia Code, Consolas, Courier New"
                          FontSize="13"/>
                 <TextBlock Grid.Row="2"
-                           Text="For command sections: use $variable:Name$ for user prompts, $homefolder$ etc. for machine variables."
+                           Text="Use $variable:Name$ for user prompts, or $hostname$ etc. for machine variables (see list →)."
                            Foreground="{StaticResource ForegroundDimBrush}"
                            FontSize="10"
                            TextWrapping="Wrap"
                            Margin="0,4,0,0"/>
             </Grid>
 
-            <!-- Section list + controls -->
+            <!-- Vertical splitter -->
+            <GridSplitter Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext"/>
+
+            <!-- Section list + controls + variables -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*" MinHeight="80"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="180" MinHeight="60"/>
                 </Grid.RowDefinitions>
 
+                <!-- Sections header -->
                 <TextBlock Grid.Row="0" Text="Sections"
                            FontWeight="SemiBold" Margin="0,0,0,4"/>
 
+                <!-- Sections list -->
                 <ListBox Grid.Row="1"
                          ItemsSource="{Binding Sections}"
                          SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
@@ -121,7 +132,7 @@
                                 </Border>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Content}"
-                                           MaxWidth="140"
+                                           MaxWidth="160"
                                            TextTrimming="CharacterEllipsis"
                                            FontSize="11"/>
                             </Grid>
@@ -129,6 +140,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
+                <!-- Section action buttons -->
                 <WrapPanel Grid.Row="2">
                     <Button Content="+ Text"    Style="{StaticResource FlatButton}" Command="{Binding AddTextSectionCommand}"    Margin="0,0,4,4" FontSize="11"/>
                     <Button Content="+ Command" Style="{StaticResource FlatButton}" Command="{Binding AddCommandSectionCommand}" Margin="0,0,4,4" FontSize="11"/>
@@ -136,6 +148,51 @@
                     <Button Content="Up"        Style="{StaticResource FlatButton}" Command="{Binding MoveSectionUpCommand}"     Margin="0,0,4,4" FontSize="11" MinWidth="30"/>
                     <Button Content="Down"      Style="{StaticResource FlatButton}" Command="{Binding MoveSectionDownCommand}"   Margin="0,0,0,4" FontSize="11" MinWidth="36"/>
                 </WrapPanel>
+
+                <!-- Horizontal splitter between sections and variables -->
+                <GridSplitter Grid.Row="3"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              ResizeBehavior="PreviousAndNext"/>
+
+                <!-- Variables header -->
+                <TextBlock Grid.Row="4" Text="Variables"
+                           FontWeight="SemiBold" Margin="0,4,0,4"/>
+
+                <!-- Variables reference list -->
+                <ListBox Grid.Row="5"
+                         ItemsSource="{Binding AvailableVariables}"
+                         Background="{StaticResource SurfaceBrush}"
+                         IsHitTestVisible="False"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="4,2"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Name}"
+                                           Foreground="{StaticResource AccentBrush}"
+                                           FontFamily="Cascadia Code, Consolas, Courier New"
+                                           FontSize="11"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Value}"
+                                           Foreground="{StaticResource ForegroundDimBrush}"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </Grid>
         </Grid>
 
