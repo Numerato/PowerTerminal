@@ -114,8 +114,12 @@ namespace PowerTerminal.Services
 
         public void SaveWiki(WikiEntry wiki)
         {
-            if (string.IsNullOrWhiteSpace(wiki.FileName))
-                wiki.FileName = SanitizeFileName(wiki.Title) + ".json";
+            bool isNew = string.IsNullOrWhiteSpace(wiki.FileName);
+            if (isNew)
+            {
+                wiki.FileName  = SanitizeFileName(wiki.Title) + ".json";
+                wiki.CreatedAt = DateTime.UtcNow;
+            }
             wiki.UpdatedAt = DateTime.UtcNow;
             string path = Path.Combine(WikiDir, wiki.FileName);
             File.WriteAllText(path, JsonSerializer.Serialize(wiki, JsonOptions));
