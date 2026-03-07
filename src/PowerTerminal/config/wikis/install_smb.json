@@ -1,0 +1,116 @@
+{
+  "Id": "33333333-0003-0003-0003-000000000003",
+  "Title": "Install Samba (SMB) on Linux",
+  "Description": "Install and configure Samba to share folders from Linux to Windows machines",
+  "Tags": ["samba", "smb", "filesharing", "ubuntu", "install", "network"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Install Samba on Ubuntu / Debian\nSamba allows Linux to share files with Windows machines using the SMB protocol.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 1: Install Samba",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y samba samba-common",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 2: Create the directory to share",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo mkdir -p /srv/samba/$variable:ShareName$\nsudo chmod 777 /srv/samba/$variable:ShareName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 3: Backup and edit the Samba configuration file",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.bak",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo nano /etc/samba/smb.conf",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Add the following block at the end of smb.conf:\nReplace the values with your settings.\n\n```\n[$variable:ShareName$]\n   comment = Samba Share\n   path = /srv/samba/$variable:ShareName$\n   read only = no\n   browsable = yes\n   guest ok = yes\n   valid users = $username$\n```",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 4: Add a Samba user\nThe Samba user must also exist as a Linux user.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo smbpasswd -a $variable:SambaUsername$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo smbpasswd -e $variable:SambaUsername$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 5: Test the Samba configuration",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "testparm",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 6: Restart Samba services",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl restart smbd nmbd\nsudo systemctl enable smbd nmbd",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 7: Allow Samba through the firewall",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo ufw allow samba",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Check Samba status and list shares",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl status smbd\nsmbclient -L localhost -N",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Connect from Windows\nOpen File Explorer and type in the address bar:\n\\\\\\\\SERVER_IP_OR_NAME\\\\$variable:ShareName$",
+      "Language": null
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "install_smb.json"
+}

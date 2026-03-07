@@ -1,0 +1,119 @@
+<Window x:Class="PowerTerminal.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
+        xmlns:views="clr-namespace:PowerTerminal.Views"
+        mc:Ignorable="d"
+        Title="PowerTerminal"
+        Height="800" Width="1400"
+        MinHeight="500" MinWidth="800"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStyle="SingleBorderWindow">
+
+    <DockPanel>
+        <!-- Top toolbar -->
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,4">
+            <DockPanel>
+                <TextBlock Text="&#x26A1; PowerTerminal"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="{StaticResource AccentBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,20,0"/>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <Button Content="+ New Tab"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding AddTabCommand}"
+                            Margin="0,0,4,0"
+                            ToolTip="Open a new terminal tab"/>
+                    <Button Content="Connections"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding OpenConnectionManagerCommand}"
+                            Margin="0,0,4,0"
+                            ToolTip="Manage SSH connections"/>
+                    <Button Content="Settings"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding OpenSettingsCommand}"
+                            ToolTip="Application settings"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            DockPanel.Dock="Right"
+                            Margin="0,0,4,0">
+                    <TextBlock Text="{Binding ActiveTerminalTab.StatusText}"
+                               Foreground="{StaticResource ForegroundDimBrush}"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Margin="0,0,12,0"/>
+                    <TextBlock VerticalAlignment="Center" FontSize="11"
+                               Foreground="{StaticResource ForegroundDimBrush}">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0}  {1}">
+                                <Binding Path="ActiveTerminalTab.Hostname"/>
+                                <Binding Path="ActiveTerminalTab.CurrentDirectory"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Main content: left terminal | splitter | right panel -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="300"/>
+                <ColumnDefinition Width="4"/>
+                <ColumnDefinition Width="480" MinWidth="300"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Terminal tabs -->
+            <TabControl Grid.Column="0"
+                        x:Name="TerminalTabControl"
+                        ItemsSource="{Binding TerminalTabs}"
+                        SelectedItem="{Binding ActiveTerminalTab, Mode=TwoWay}"
+                        Background="{StaticResource BackgroundBrush}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Header}" VerticalAlignment="Center"/>
+                            <Button Content="x"
+                                    Style="{StaticResource IconButton}"
+                                    FontSize="10" Margin="6,0,0,0" Padding="2,0"
+                                    Tag="{Binding}"
+                                    Click="CloseTab_Click"
+                                    ToolTip="Close tab"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+                <TabControl.ContentTemplate>
+                    <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
+                        <views:TerminalTabView/>
+                    </DataTemplate>
+                </TabControl.ContentTemplate>
+            </TabControl>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ResizeBehavior="PreviousAndNext"/>
+
+            <!-- RIGHT: AI Chat + Wiki tabs -->
+            <TabControl Grid.Column="2"
+                        SelectedIndex="{Binding RightTabIndex, Mode=TwoWay}"
+                        Background="{StaticResource SurfaceBrush}">
+                <TabItem Header="AI Chat">
+                    <views:AiChatView DataContext="{Binding AiChat}"/>
+                </TabItem>
+                <TabItem Header="Wiki">
+                    <views:WikiView DataContext="{Binding Wiki}"/>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </DockPanel>
+</Window>

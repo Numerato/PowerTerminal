@@ -1,0 +1,67 @@
+<UserControl x:Class="PowerTerminal.Views.TerminalTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:PowerTerminal.Controls"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Connection bar (shown when not connected) -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,4"
+                Visibility="{Binding IsConnected, Converter={StaticResource BoolToInvisConverter}}">
+            <DockPanel>
+                <TextBlock Text="Not connected"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0"/>
+                <Button Content="Connect"
+                        Style="{StaticResource AccentButton}"
+                        Command="{Binding ConnectCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,4,0"/>
+                <Button Content="Disconnect"
+                        Style="{StaticResource FlatButton}"
+                        Command="{Binding DisconnectCommand}"
+                        HorizontalAlignment="Left"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Terminal output -->
+        <ctrl:TerminalControl x:Name="Terminal"
+                              Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto"/>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8,3">
+            <DockPanel>
+                <Ellipse Width="8" Height="8"
+                         Fill="{Binding IsConnected, Converter={StaticResource BoolToColorBrushConverter}}"
+                         Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="11" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                    <TextBlock Text="{Binding OsVersion}"
+                               Foreground="{StaticResource ForegroundDimBrush}"
+                               FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding IpAddress}"
+                               Foreground="{StaticResource ForegroundDimBrush}"
+                               FontSize="10" VerticalAlignment="Center"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,12 @@
+[
+  {
+    "Id": "a1b2c3d4-0000-0000-0000-000000000001",
+    "Name": "dockerhome",
+    "Host": "dockerhome.local",
+    "Username": "Geertm",
+    "Port": 22,
+    "Password": null,
+    "PrivateKeyPath": null,
+    "LastConnected": null
+  }
+]

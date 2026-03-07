@@ -1,0 +1,96 @@
+{
+  "Id": "22222222-0002-0002-0002-000000000002",
+  "Title": "Install Docker on Linux (Ubuntu/Debian)",
+  "Description": "Step-by-step guide to installing Docker Engine on Ubuntu or Debian",
+  "Tags": ["docker", "ubuntu", "debian", "containers", "install"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Install Docker on Ubuntu / Debian\nThis guide installs Docker Engine from the official Docker repository. Run all commands as root or with sudo.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 1: Update apt and install prerequisites",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg lsb-release",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 2: Add Docker's official GPG key",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo install -m 0755 -d /etc/apt/keyrings\ncurl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg\nsudo chmod a+r /etc/apt/keyrings/docker.gpg",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 3: Add the Docker repository",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 4: Install Docker Engine",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 5: Verify installation",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo docker run hello-world",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 6 (Optional): Run Docker without sudo\nAdd your user to the docker group so you don't need sudo for every docker command.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo usermod -aG docker $username$\nnewgrp docker",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 7: Enable Docker to start on boot",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl enable docker\nsudo systemctl start docker",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Check Docker status and version",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "docker --version && docker compose version && sudo systemctl status docker",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "install_docker.json"
+}

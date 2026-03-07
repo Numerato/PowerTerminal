@@ -1,0 +1,110 @@
+<UserControl x:Class="PowerTerminal.Views.AiChatView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
+             xmlns:models="clr-namespace:PowerTerminal.Models"
+             Background="{StaticResource SurfaceBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Message list -->
+        <Border Grid.Row="0"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <ScrollViewer x:Name="MessagesScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Background="{StaticResource BackgroundBrush}">
+                <ItemsControl x:Name="MessagesList"
+                              ItemsSource="{Binding Messages}"
+                              Padding="8,8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:AiMessage}">
+                            <Border Margin="0,0,0,12"
+                                    Padding="12,8"
+                                    CornerRadius="6"
+                                    Background="{Binding Role, Converter={StaticResource RoleToBackgroundConverter}}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0"
+                                               Text="{Binding Role, Converter={StaticResource RoleToLabelConverter}}"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               Foreground="{Binding Role, Converter={StaticResource RoleToForeConverter}}"
+                                               Margin="0,0,0,4"/>
+                                    <TextBox Grid.Row="1"
+                                             Text="{Binding Content, Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             TextWrapping="Wrap"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="{StaticResource ForegroundBrush}"
+                                             FontFamily="Segoe UI, Arial"
+                                             FontSize="13"
+                                             Padding="0"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Input area -->
+        <Grid Grid.Row="1" Margin="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Busy indicator -->
+            <TextBlock Grid.Row="0"
+                       Text="AI is thinking..."
+                       Foreground="{StaticResource ForegroundDimBrush}"
+                       FontSize="11"
+                       Margin="0,0,0,4"
+                       Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisConverter}}"/>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0"
+                         x:Name="InputBox"
+                         Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="False"
+                         MinHeight="36"
+                         MaxHeight="120"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         Margin="0,0,6,0"
+                         KeyDown="InputBox_KeyDown"
+                         ToolTip="Type your message. Press Enter to send, Shift+Enter for new line."/>
+                <Button Grid.Column="1"
+                        Content="Send"
+                        Style="{StaticResource AccentButton}"
+                        Command="{Binding SendCommand}"
+                        Margin="0,0,4,0"
+                        MinWidth="60"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Content="Clear"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding ClearCommand}"
+                            Margin="0,0,4,0"/>
+                    <Button Content="Stop"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding CancelCommand}"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisConverter}}"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

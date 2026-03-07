@@ -1,0 +1,101 @@
+{
+  "Id": "66666666-0006-0006-0006-000000000006",
+  "Title": "Run a .NET Application as an Ubuntu Systemd Daemon",
+  "Description": "Install and configure a .NET 8/9/10 application as a systemd service on Ubuntu",
+  "Tags": ["dotnet", "systemd", "daemon", "service", "ubuntu", "linux", ".net"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Run a .NET Application as a Linux Daemon\nThis guide installs the .NET runtime and configures your .NET application as a systemd service so it starts automatically on boot.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 1: Install the .NET Runtime on Ubuntu\nInstall the Microsoft package repository and then the runtime.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y wget apt-transport-https\nwget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb\nsudo dpkg -i packages-microsoft-prod.deb\nrm packages-microsoft-prod.deb",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y dotnet-runtime-10.0",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 2: Create the application directory and publish your app",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo mkdir -p /opt/$variable:AppName$\nsudo chown $username$:$username$ /opt/$variable:AppName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "Copy your published .NET application files to /opt/$variable:AppName$/\nYou can use SCP or SFTP to transfer files.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 3: Create the systemd service file",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo nano /etc/systemd/system/$variable:AppName$.service",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Service file content:\nPaste the following into the editor (adjust paths and user as needed):\n\n```ini\n[Unit]\nDescription=$variable:AppName$ .NET Service\nAfter=network.target\n\n[Service]\nType=notify\nUser=$username$\nWorkingDirectory=/opt/$variable:AppName$\nExecStart=/usr/bin/dotnet /opt/$variable:AppName$/$variable:DllFileName$\nRestart=always\nRestartSec=5\nSyslogIdentifier=$variable:AppName$\nEnvironment=ASPNETCORE_ENVIRONMENT=Production\nEnvironment=DOTNET_PRINT_TELEMETRY_MESSAGE=false\n\n[Install]\nWantedBy=multi-user.target\n```",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 4: Enable and start the service",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl daemon-reload\nsudo systemctl enable $variable:AppName$\nsudo systemctl start $variable:AppName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 5: Check the service status",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl status $variable:AppName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### View service logs",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo journalctl -u $variable:AppName$ -f",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Useful service management commands",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo systemctl stop $variable:AppName$\nsudo systemctl restart $variable:AppName$\nsudo systemctl disable $variable:AppName$",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "dotnet_daemon.json"
+}

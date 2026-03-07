@@ -1,0 +1,121 @@
+{
+  "Id": "77777777-0007-0007-0007-000000000007",
+  "Title": "Must-Have Tools on Ubuntu",
+  "Description": "Essential utilities and productivity tools every Ubuntu system should have",
+  "Tags": ["ubuntu", "tools", "utilities", "essential", "productivity", "monitoring"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Must-Have Ubuntu Command Line Tools\nThis wiki lists essential utilities for any Ubuntu system and how to install them.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Install all essential tools at once",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo apt-get update && sudo apt-get install -y \\\n  nano \\\n  vim \\\n  htop \\\n  btop \\\n  curl \\\n  wget \\\n  git \\\n  net-tools \\\n  nmap \\\n  ncdu \\\n  tree \\\n  tmux \\\n  screen \\\n  unzip \\\n  zip \\\n  rsync \\\n  jq \\\n  build-essential \\\n  python3-pip \\\n  lsof \\\n  iotop \\\n  dstat \\\n  mtr \\\n  traceroute \\\n  sysstat",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Tool Reference\n\n### Text Editors\n- **nano** – Simple, beginner-friendly terminal editor\n- **vim** – Powerful, keyboard-driven editor (steep learning curve)\n\n### System Monitoring\n- **htop** – Interactive process viewer (better than top)\n- **btop** – Modern, colorful resource monitor\n- **iotop** – Monitor disk I/O by process\n- **dstat** – Combined CPU, memory, disk, network statistics\n- **sysstat (sar, iostat)** – System activity reporter\n\n### Network Tools\n- **net-tools (ifconfig, netstat)** – Classic network utilities\n- **nmap** – Network port scanner\n- **mtr** – Combines ping + traceroute\n- **traceroute** – Trace network path to a host\n\n### File Management\n- **ncdu** – Disk usage analyzer with ncurses UI\n- **tree** – Display directory structure as a tree\n- **rsync** – Fast file synchronization\n- **unzip/zip** – Archive management\n\n### Multiplexers\n- **tmux** – Terminal multiplexer (multiple panes, sessions)\n- **screen** – Alternative terminal multiplexer\n\n### Development\n- **git** – Version control\n- **jq** – JSON processor\n- **build-essential** – GCC, make, and other build tools\n- **python3-pip** – Python package manager",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### nano – edit a file",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "nano $variable:FileName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### htop – interactive process viewer",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "htop",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### btop – modern resource monitor",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "btop",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### ncdu – disk usage analyser",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "ncdu $CurrentDirectory$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### tmux – start a new session",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "tmux new -s $variable:SessionName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### List open ports",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo ss -tlnp",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Show disk usage summary",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "df -h",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Find large files in current directory",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "du -ah $CurrentDirectory$ | sort -rh | head -20",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Check system info summary",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "uname -a && uptime && free -h && df -h",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "ubuntu_must_have_tools.json"
+}

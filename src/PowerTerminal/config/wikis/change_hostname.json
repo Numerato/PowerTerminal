@@ -1,0 +1,71 @@
+{
+  "Id": "55555555-0005-0005-0005-000000000005",
+  "Title": "Change the Hostname of a Linux Computer",
+  "Description": "Permanently change the hostname of a Linux machine using hostnamectl",
+  "Tags": ["hostname", "linux", "network", "configuration", "ubuntu"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Change the Linux Hostname\nThe hostname identifies your machine on the network. Changing it requires updating /etc/hostname and /etc/hosts.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 1: View the current hostname",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "hostnamectl",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 2: Set the new hostname\nThis sets it permanently (survives reboots).",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo hostnamectl set-hostname $variable:NewHostname$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 3: Update /etc/hosts to reflect the new hostname\nFind the line with the old hostname and update it.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo nano /etc/hosts",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "In /etc/hosts, change the line:\n127.0.1.1   OLD_HOSTNAME\nto:\n127.0.1.1   $variable:NewHostname$",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 4: Verify the change",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "hostname && cat /etc/hostname",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 5 (Optional): Reboot to fully apply the change",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo reboot",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "change_hostname.json"
+}
