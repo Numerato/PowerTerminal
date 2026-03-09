@@ -24,7 +24,7 @@
     <Color x:Key="BackgroundColor">#000000</Color>
     <Color x:Key="SurfaceColor">#1A1A1A</Color>
     <Color x:Key="SurfaceHighColor">#2D2D2D</Color>
-    <Color x:Key="TitleBarColor">#0A0A0A</Color>
+    <Color x:Key="TitleBarColor">#18191b</Color>
     <Color x:Key="BorderColor">#3E3E3E</Color>
     <Color x:Key="ForegroundColor">#CCCCCC</Color>
     <Color x:Key="ForegroundDimColor">#888888</Color>

@@ -22,7 +22,7 @@
     </WindowChrome.WindowChrome>
 
     <!-- Outer border: 1 px subtle gray outline + 8 px rounded corners -->
-    <Border BorderBrush="#777777"
+    <Border BorderBrush="#3b3b3c"
             BorderThickness="1"
             CornerRadius="8"
             Background="{StaticResource BackgroundBrush}"
@@ -34,7 +34,10 @@
             </Grid.RowDefinitions>
 
             <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
-            <Grid Grid.Row="0"
+            <Border Grid.Row="0"
+                    BorderBrush="#3b3b3c"
+                    BorderThickness="0,0,0,1">
+            <Grid
                   Background="{StaticResource TitleBarBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -146,7 +149,7 @@
                             <!-- White "+" new-tab icon -->
                             <TextBlock Text="+"
                                        FontSize="18"
-                                       FontWeight="Light"
+                                       FontWeight="bold"
                                        Foreground="White"
                                        VerticalAlignment="Center"
                                        Margin="0,-1,0,0"/>
@@ -251,7 +254,7 @@
                     </Button>
                 </StackPanel>
             </Grid>
-
+</Border>
             <!-- ════════════ CONTENT AREA ════════════ -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
