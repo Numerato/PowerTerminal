@@ -60,13 +60,12 @@ namespace PowerTerminal.ViewModels
             _isAddMode = false;
             Editing = new SshConnection
             {
-                Id             = Selected.Id,
-                Name           = Selected.Name,
-                Host           = Selected.Host,
-                Username       = Selected.Username,
-                Port           = Selected.Port,
-                PrivateKeyPath = Selected.PrivateKeyPath,
-                LogoPath       = Selected.LogoPath
+                Id       = Selected.Id,
+                Name     = Selected.Name,
+                Host     = Selected.Host,
+                Username = Selected.Username,
+                Port     = Selected.Port,
+                LogoPath = Selected.LogoPath
             };
         }
 

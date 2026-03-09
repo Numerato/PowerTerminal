@@ -1,3 +1,5 @@
+using System;
+
 namespace PowerTerminal.Models
 {
     public class AppSettings
@@ -6,6 +8,13 @@ namespace PowerTerminal.Models
         public ThemeSettings Theme { get; set; } = new();
         public string LogDirectory { get; set; } = "logs";
         public string WikiDirectory { get; set; } = "config/wikis";
+
+        /// <summary>
+        /// Global folder searched for SSH private keys (id_rsa, id_ed25519, …).
+        /// Per-host keys are auto-discovered by matching known_hosts or filename convention.
+        /// </summary>
+        public string SshKeysFolder { get; set; } =
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + @"\.ssh";
     }
 
     public class AiSettings
@@ -25,9 +34,9 @@ namespace PowerTerminal.Models
 
     public class ThemeSettings
     {
-        public string Background { get; set; } = "#0C0C0C";
+        public string Background { get; set; } = "#000000";
         public string Foreground { get; set; } = "#CCCCCC";
-        public string AccentColor { get; set; } = "#0078D4";
+        public string AccentColor { get; set; } = "#E87722";
         public string FontFamily { get; set; } = "Cascadia Code, Consolas, Courier New";
         public double FontSize { get; set; } = 13.0;
     }

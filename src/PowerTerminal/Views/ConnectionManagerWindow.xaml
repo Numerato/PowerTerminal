@@ -75,7 +75,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"/>
@@ -98,50 +98,63 @@
                 <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,6"
                          Text="{Binding Editing.Port, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <Label Grid.Row="4" Grid.Column="0" Content="Private Key:"/>
-                <Grid Grid.Row="4" Grid.Column="1" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0"
-                             Text="{Binding Editing.PrivateKeyPath, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,4,0"/>
-                    <Button Grid.Column="1" Content="Browse"
-                            Style="{StaticResource FlatButton}"
-                            Click="BrowseKey_Click"
-                            Margin="0,0,4,0"/>
-                    <Button Grid.Column="2" Content="Clear"
-                            Style="{StaticResource FlatButton}"
-                            Click="ClearKey_Click"/>
-                </Grid>
+                <!-- Tab Logo: predefined icons grid + custom browse -->
+                <Label Grid.Row="4" Grid.Column="0" Content="Tab Icon:"
+                       VerticalAlignment="Top" Margin="0,4,0,0"/>
+                <StackPanel Grid.Row="4" Grid.Column="1" Margin="0,0,0,6">
+                    <!-- Predefined icons row -->
+                    <ItemsControl x:Name="PredefinedIconsList"
+                                  Margin="0,0,0,6">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Each item is a string (full path) -->
+                                <Button Tag="{Binding}"
+                                        Click="PredefinedIcon_Click"
+                                        Style="{StaticResource IconButton}"
+                                        Margin="2"
+                                        Width="32" Height="32"
+                                        ToolTip="{Binding}">
+                                    <Image Source="{Binding Converter={StaticResource StringToImageConverter}}"
+                                           Width="24" Height="24"
+                                           Stretch="Uniform"/>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <Label Grid.Row="5" Grid.Column="0" Content="Tab Logo:"/>
-                <Grid Grid.Row="5" Grid.Column="1" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0"
-                             Text="{Binding Editing.LogoPath, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,4,0"
-                             ToolTip="Path to a PNG/JPG/ICO image shown in the tab header (leave empty for default icon)"/>
-                    <Button Grid.Column="1" Content="Browse"
-                            Style="{StaticResource FlatButton}"
-                            Click="BrowseLogo_Click"
-                            Margin="0,0,4,0"/>
-                    <Button Grid.Column="2" Content="Clear"
-                            Style="{StaticResource FlatButton}"
-                            Click="ClearLogo_Click"/>
-                </Grid>
+                    <!-- Custom path row -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding Editing.LogoPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,4,0"
+                                 ToolTip="Path to a PNG/JPG/ICO image shown in the tab header (leave empty for default icon)"/>
+                        <Button Grid.Column="1" Content="Browse"
+                                Style="{StaticResource FlatButton}"
+                                Click="BrowseLogo_Click"
+                                Margin="0,0,4,0"/>
+                        <Button Grid.Column="2" Content="Clear"
+                                Style="{StaticResource FlatButton}"
+                                Click="ClearLogo_Click"/>
+                    </Grid>
+                </StackPanel>
 
-                <TextBlock Grid.Row="6" Grid.ColumnSpan="2"
-                           Text="Leave Private Key empty to authenticate with a password (you will be prompted on connect)."
+                <!-- SSH key info -->
+                <TextBlock Grid.Row="5" Grid.ColumnSpan="2"
+                           Text="SSH keys are loaded automatically from the global SSH keys folder (Settings → SSH Keys Folder). Password will be requested on connect if no matching key is found."
                            Foreground="{StaticResource ForegroundDimBrush}"
                            FontSize="11"
-                           TextWrapping="Wrap"/>
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0"/>
             </Grid>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal"

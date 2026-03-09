@@ -1,4 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using PowerTerminal.ViewModels;
 
@@ -10,25 +15,38 @@ namespace PowerTerminal.Views
         {
             InitializeComponent();
             DataContext = vm;
+            PopulatePredefinedIcons();
         }
 
         private ConnectionManagerViewModel Vm => (ConnectionManagerViewModel)DataContext;
 
-        private void BrowseKey_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Fills the predefined-icons grid with every PNG/ICO/JPG found in the
+        /// application's <c>icons/</c> folder (ships with the application).
+        /// </summary>
+        private void PopulatePredefinedIcons()
         {
-            var dlg = new OpenFileDialog
-            {
-                Title  = "Select private key file",
-                Filter = "PEM files (*.pem)|*.pem|All files (*.*)|*.*"
-            };
-            if (dlg.ShowDialog() == true && Vm.Editing != null)
-                Vm.Editing.PrivateKeyPath = dlg.FileName;
+            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icons");
+            if (!Directory.Exists(iconsDir)) return;
+
+            var files = Directory
+                .GetFiles(iconsDir, "*.*")
+                .Where(f =>
+                {
+                    var ext = Path.GetExtension(f).ToLowerInvariant();
+                    return ext is ".png" or ".jpg" or ".jpeg" or ".ico";
+                })
+                .OrderBy(f => string.Equals(Path.GetFileName(f), "linux.png",
+                                            StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(f => Path.GetFileName(f));
+
+            PredefinedIconsList.ItemsSource = files.ToList();
         }
 
-        private void ClearKey_Click(object sender, RoutedEventArgs e)
+        private void PredefinedIcon_Click(object sender, RoutedEventArgs e)
         {
-            if (Vm.Editing != null)
-                Vm.Editing.PrivateKeyPath = null;
+            if (sender is Button btn && btn.Tag is string path && Vm.Editing != null)
+                Vm.Editing.LogoPath = path;
         }
 
         private void BrowseLogo_Click(object sender, RoutedEventArgs e)

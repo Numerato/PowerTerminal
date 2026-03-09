@@ -21,17 +21,28 @@ namespace PowerTerminal.ViewModels
         private string _statusText = "Disconnected";
         private MachineInfo? _machineInfo;
 
-        // ── Inline password capture ───────────────────────────────────────────
-        private volatile bool _capturingPassword;
-        private readonly StringBuilder _passwordBuffer = new();
-        private SemaphoreSlim _passwordInputReady = new(0, 1);
-
         /// <summary>
         /// When true the tab view will call <see cref="ConnectAsync"/> as soon as it loads.
         /// Set by <c>MainViewModel.ConnectToConnection</c>; cleared immediately in OnLoaded
         /// so that tab-switch view-recreations do not trigger a second connection attempt.
         /// </summary>
         public bool AutoConnectOnLoad { get; set; }
+
+        /// <summary>
+        /// Global SSH keys folder passed through to <see cref="SshService.SshKeysFolder"/>.
+        /// Set by <see cref="MainViewModel"/> from <see cref="AppSettings.SshKeysFolder"/>.
+        /// </summary>
+        public string SshKeysFolder { get; set; } =
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
+
+        /// <summary>
+        /// Raised on the UI thread when a password prompt is needed.
+        /// The subscriber shows a dialog and returns the entered password,
+        /// or <c>null</c> if the user cancels.
+        /// Receives the server's prompt text as the argument.
+        /// </summary>
+        public Func<string, string?>? PasswordPromptRequested { get; set; }
 
         public TerminalTabViewModel(LoggingService log)
         {
@@ -115,13 +126,6 @@ namespace PowerTerminal.ViewModels
         {
             if (Connection == null) return;
 
-            // Reset inline password capture state for this connection attempt.
-            _capturingPassword = false;
-            _passwordBuffer.Clear();
-            var oldSemaphore = _passwordInputReady;
-            _passwordInputReady = new SemaphoreSlim(0, 1);
-            oldSemaphore.Dispose();
-
             IsConnecting = true;
             StatusText = $"Connecting to {Connection.Host}…";
             WriteToTerminal($"\r\nConnecting to {Connection.Username}@{Connection.Host}:{Connection.Port}...\r\n");
@@ -129,18 +133,22 @@ namespace PowerTerminal.ViewModels
             try
             {
                 _ssh?.Dispose();
-                _ssh = new SshService(_log);
+                _ssh = new SshService(_log)
+                {
+                    SshKeysFolder = SshKeysFolder
+                };
 
-                // Password prompt: write the server's prompt into the terminal and
-                // wait for the user to type the password and press Enter.
+                // Password prompt: show a modal dialog on the UI thread.
+                // The SSH.NET keyboard-interactive callback runs on a background thread,
+                // so we dispatch back to the UI thread and block until the user responds.
                 _ssh.PasswordPrompt = prompt =>
                 {
-                    WriteToTerminal(prompt);
-                    _capturingPassword = true;
-                    // Block the SSH background thread until the user presses Enter
-                    // (or for at most 2 minutes to avoid an indefinite hang).
-                    _passwordInputReady.Wait(TimeSpan.FromMinutes(2));
-                    return _passwordBuffer.ToString();
+                    string password = string.Empty;
+                    Application.Current?.Dispatcher.Invoke(() =>
+                    {
+                        password = PasswordPromptRequested?.Invoke(prompt) ?? string.Empty;
+                    });
+                    return password;
                 };
 
                 _ssh.DataReceived += data => Application.Current?.Dispatcher.Invoke(() => TerminalDataReceived?.Invoke(data));
@@ -166,14 +174,6 @@ namespace PowerTerminal.ViewModels
             }
             catch (Exception ex)
             {
-                // If authentication was in progress, unblock the capture semaphore.
-                if (_capturingPassword)
-                {
-                    _capturingPassword = false;
-                    _passwordBuffer.Clear();
-                    _passwordInputReady.Release();
-                }
-
                 IsConnecting = false;
                 StatusText   = $"Failed: {ex.Message}";
                 Header       = $"✕ {Connection?.Name ?? "Terminal"}";
@@ -191,40 +191,6 @@ namespace PowerTerminal.ViewModels
 
         public void SendData(string data)
         {
-            if (_capturingPassword)
-            {
-                foreach (char ch in data)
-                {
-                    if (ch == '\r')                      // Enter — submit password
-                    {
-                        _capturingPassword = false;
-                        LocalOutput?.Invoke("\r\n");     // move to next line
-                        _passwordInputReady.Release();
-                        return;
-                    }
-                    else if (ch == '\x03')               // Ctrl+C — cancel
-                    {
-                        _capturingPassword = false;
-                        _passwordBuffer.Clear();
-                        LocalOutput?.Invoke("^C\r\n");
-                        _passwordInputReady.Release();
-                        return;
-                    }
-                    else if (ch == '\x7f' || ch == '\b') // Backspace
-                    {
-                        if (_passwordBuffer.Length > 0)
-                            _passwordBuffer.Remove(_passwordBuffer.Length - 1, 1);
-                        // No echo — password stays hidden
-                    }
-                    else if (ch >= ' ')                  // Printable character
-                    {
-                        _passwordBuffer.Append(ch);
-                        // No echo — do not show asterisks or the character
-                    }
-                }
-                return;
-            }
-
             if (IsConnected) _ssh?.SendData(data);
         }
 
@@ -259,7 +225,6 @@ namespace PowerTerminal.ViewModels
         public void Dispose()
         {
             _ssh?.Dispose();
-            _passwordInputReady.Dispose();
         }
     }
 }

@@ -89,7 +89,34 @@
 
                 <Separator Margin="0,12,0,12"/>
 
-                <!-- Theme settings -->
+                <!-- SSH Settings -->
+                <TextBlock Text="SSH Configuration"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource AccentBrush}"
+                           Margin="0,0,0,8"/>
+
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="SSH Keys Folder:"/>
+                    <TextBox Grid.Column="1" x:Name="SshKeysFolderInput"
+                             ToolTip="Folder to search for SSH private keys (id_rsa, id_ed25519, …). Default: %USERPROFILE%\.ssh"
+                             Margin="0,0,4,0"/>
+                    <Button Grid.Column="2" Content="Browse"
+                            Style="{StaticResource FlatButton}"
+                            Click="BrowseSshFolder_Click"/>
+                </Grid>
+
+                <TextBlock Text="Keys are auto-discovered by host name, known_hosts, and standard filenames (id_ed25519, id_rsa, …). No per-connection key configuration required."
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="140,0,0,0"/>
+
+                <Separator Margin="0,12,0,12"/>
                 <TextBlock Text="Terminal Appearance"
                            FontSize="13" FontWeight="SemiBold"
                            Foreground="{StaticResource AccentBrush}"

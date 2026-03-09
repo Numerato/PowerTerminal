@@ -9,9 +9,9 @@
         Title="PowerTerminal"
         Height="800" Width="1400"
         MinHeight="500" MinWidth="800"
-        Background="{StaticResource BackgroundBrush}"
+        Background="Transparent"
         WindowStyle="None"
-        AllowsTransparency="False"
+        AllowsTransparency="True"
         ResizeMode="CanResizeWithGrip">
 
     <WindowChrome.WindowChrome>
@@ -21,291 +21,294 @@
                       ResizeBorderThickness="6"/>
     </WindowChrome.WindowChrome>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="44"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <!-- Outer border: 1 px subtle gray outline + 8 px rounded corners -->
+    <Border BorderBrush="#555555"
+            BorderThickness="1"
+            CornerRadius="8"
+            Background="{StaticResource BackgroundBrush}"
+            ClipToBounds="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
-        <Grid Grid.Row="0"
-              Background="{StaticResource TitleBarBrush}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+            <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
+            <Grid Grid.Row="0"
+                  Background="{StaticResource TitleBarBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Logo: lightning bolt + app name -->
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Center"
-                        Margin="12,0,6,0">
-                <TextBlock Text="⚡"
-                           Foreground="{StaticResource AccentBrush}"
-                           FontSize="18"
-                           VerticalAlignment="Center"
-                           Margin="0,0,5,0"/>
-                <TextBlock Text="PowerTerminal"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- Centre: tab strip + Connect dropdown -->
-            <DockPanel Grid.Column="1"
-                       LastChildFill="False"
-                       VerticalAlignment="Stretch"
-                       WindowChrome.IsHitTestVisibleInChrome="True">
-
-                <!-- Terminal tab headers -->
-                <ListBox DockPanel.Dock="Left"
-                         ItemsSource="{Binding TerminalTabs}"
-                         SelectedItem="{Binding ActiveTerminalTab, Mode=TwoWay}"
-                         Style="{StaticResource TabStripListBox}"
-                         WindowChrome.IsHitTestVisibleInChrome="True">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource TabStripItem}"/>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid MinWidth="100" MaxWidth="200">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Custom logo image (when set) -->
-                                <Image Grid.Column="0"
-                                       Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
-                                       Width="16" Height="16"
-                                       Margin="0,0,6,0"
-                                       VerticalAlignment="Center"
-                                       Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
-
-                                <!-- Default >_ icon (when no logo set) -->
-                                <TextBlock Grid.Column="0"
-                                           Text=">_"
-                                           FontFamily="Cascadia Code, Consolas, Courier New"
-                                           FontSize="11"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           Margin="0,0,6,0"
-                                           VerticalAlignment="Center"
-                                           Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"/>
-
-                                <!-- Tab name -->
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding Header}"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           FontSize="12"/>
-
-                                <!-- Close ✕ (visible on hover only) -->
-                                <Button x:Name="CloseBtn"
-                                        Grid.Column="2"
-                                        Content="✕"
-                                        Style="{StaticResource TabCloseButton}"
-                                        Tag="{Binding}"
-                                        Click="CloseTab_Click"
-                                        Margin="6,0,0,0"
-                                        Visibility="Hidden"
-                                        WindowChrome.IsHitTestVisibleInChrome="True"
-                                        ToolTip="Close tab"/>
-                            </Grid>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Value="True">
-                                    <DataTrigger.Binding>
-                                        <Binding RelativeSource="{RelativeSource AncestorType=ListBoxItem}"
-                                                 Path="IsMouseOver"/>
-                                    </DataTrigger.Binding>
-                                    <Setter TargetName="CloseBtn" Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
-                <!-- Connect ▾ button + popup -->
-                <Grid DockPanel.Dock="Left"
-                      VerticalAlignment="Center"
-                      Margin="4,0,0,0">
-                    <Button x:Name="ConnectBtn"
-                            Style="{StaticResource TitleBarButton}"
-                            Click="ConnectBtn_Click"
-                            WindowChrome.IsHitTestVisibleInChrome="True"
-                            Padding="10,6"
-                            ToolTip="Connect to a saved SSH connection">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Connect" VerticalAlignment="Center"/>
-                            <TextBlock Text=" ▾" FontSize="9" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    <Popup x:Name="ConnectPopup"
-                           Placement="Bottom"
-                           PlacementTarget="{Binding ElementName=ConnectBtn}"
-                           StaysOpen="False">
-                        <Border Background="{StaticResource SurfaceBrush}"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                BorderThickness="1"
-                                MinWidth="240"
-                                Padding="0,4">
-                            <StackPanel>
-                                <TextBlock Text="Connections"
-                                           Foreground="{StaticResource ForegroundDimBrush}"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Padding="14,4,14,6"/>
-                                <ItemsControl ItemsSource="{Binding ConnectionManager.Connections}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Tag="{Binding}"
-                                                    Click="ConnectItem_Click"
-                                                    Style="{StaticResource ConnectPopupItem}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text=">_"
-                                                               FontFamily="Cascadia Code, Consolas, Courier New"
-                                                               FontSize="11"
-                                                               Foreground="{StaticResource AccentBrush}"
-                                                               Margin="0,0,10,0"
-                                                               VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Name}"
-                                                               VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <!-- Placeholder when no connections configured -->
-                                <TextBlock Text="No connections configured."
-                                           Foreground="{StaticResource ForegroundDimBrush}"
-                                           FontSize="11"
-                                           Padding="14,6"
-                                           Visibility="{Binding ConnectionManager.Connections.Count,
-                                               Converter={StaticResource ZeroCountToVisConverter}}"/>
-                                <Separator Margin="0,4"/>
-                                <Button Content="Manage Connections…"
-                                        Style="{StaticResource ConnectPopupItem}"
-                                        Foreground="{StaticResource ForegroundDimBrush}"
-                                        Click="ManageConnections_Click"/>
-                            </StackPanel>
-                        </Border>
-                    </Popup>
-                </Grid>
-            </DockPanel>
-
-            <!-- Right: status info + settings + window controls -->
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Stretch"
-                        WindowChrome.IsHitTestVisibleInChrome="True">
-
-                <!-- Active terminal status text -->
-                <TextBlock Text="{Binding ActiveTerminalTab.StatusText}"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           VerticalAlignment="Center"
-                           FontSize="11"
-                           Margin="0,0,12,0"/>
-
-                <!-- Settings gear (orange) -->
-                <Button Style="{StaticResource TitleBarButton}"
-                        Click="Settings_Click"
-                        Padding="10,6"
-                        Margin="0,0,8,0"
-                        ToolTip="Settings">
-                    <TextBlock Text="⚙"
-                               FontSize="15"
-                               Foreground="{StaticResource AccentBrush}"
-                               VerticalAlignment="Center"/>
-                </Button>
-
-                <!-- Minimize -->
-                <Button Style="{StaticResource WinControlButton}"
-                        Click="Minimize_Click"
-                        ToolTip="Minimize">
-                    <TextBlock Text="&#xE921;"
-                               FontFamily="Segoe MDL2 Assets"
-                               FontSize="10"/>
-                </Button>
-
-                <!-- Maximize / Restore -->
-                <Button x:Name="MaxRestoreBtn"
-                        Style="{StaticResource WinControlButton}"
-                        Click="MaximizeRestore_Click"
-                        ToolTip="Maximize">
-                    <TextBlock x:Name="MaxRestoreIcon"
-                               Text="&#xE922;"
-                               FontFamily="Segoe MDL2 Assets"
-                               FontSize="10"/>
-                </Button>
-
-                <!-- Close -->
-                <Button Style="{StaticResource WinCloseButton}"
-                        Click="CloseWindow_Click"
-                        ToolTip="Close">
-                    <TextBlock Text="&#xE8BB;"
-                               FontFamily="Segoe MDL2 Assets"
-                               FontSize="11"/>
-                </Button>
-            </StackPanel>
-        </Grid>
-
-        <!-- ════════════ CONTENT AREA ════════════ -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="300"/>
-                <ColumnDefinition Width="4"/>
-                <ColumnDefinition Width="480" MinWidth="300"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Active terminal content -->
-            <Grid Grid.Column="0">
-                <!-- Welcome placeholder (shown when no tabs are open) -->
-                <StackPanel HorizontalAlignment="Center"
+                <!-- Logo: lightning bolt + app name -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Visibility="{Binding ActiveTerminalTab,
-                                Converter={StaticResource NullToVisInvertConverter}}">
-                    <TextBlock Text="⚡ PowerTerminal"
-                               FontSize="28" FontWeight="Bold"
+                            Margin="12,0,6,0">
+                    <TextBlock Text="⚡"
                                Foreground="{StaticResource AccentBrush}"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,0,14"/>
-                    <TextBlock Text="Click  Connect ▾  to open a connection"
+                               FontSize="18"
+                               VerticalAlignment="Center"
+                               Margin="0,0,5,0"/>
+                    <TextBlock Text="PowerTerminal"
                                Foreground="{StaticResource ForegroundDimBrush}"
-                               FontSize="14"
-                               HorizontalAlignment="Center"/>
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Terminal view for the active tab -->
-                <ContentControl Content="{Binding ActiveTerminalTab}"
-                                Visibility="{Binding ActiveTerminalTab,
-                                    Converter={StaticResource NullToVisConverter}}">
-                    <ContentControl.ContentTemplate>
-                        <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
-                            <views:TerminalTabView/>
-                        </DataTemplate>
-                    </ContentControl.ContentTemplate>
-                </ContentControl>
+                <!-- Centre: tab strip + "+" new connection button -->
+                <DockPanel Grid.Column="1"
+                           LastChildFill="False"
+                           VerticalAlignment="Stretch"
+                           WindowChrome.IsHitTestVisibleInChrome="True">
+
+                    <!-- Terminal tab headers -->
+                    <ListBox DockPanel.Dock="Left"
+                             ItemsSource="{Binding TerminalTabs}"
+                             SelectedItem="{Binding ActiveTerminalTab, Mode=TwoWay}"
+                             Style="{StaticResource TabStripListBox}"
+                             WindowChrome.IsHitTestVisibleInChrome="True">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource TabStripItem}"/>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid MinWidth="100" MaxWidth="200">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Custom logo image (when set) -->
+                                    <Image Grid.Column="0"
+                                           Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
+                                           Width="16" Height="16"
+                                           Margin="0,0,6,0"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
+
+                                    <!-- Default >_ icon (when no logo set) -->
+                                    <TextBlock Grid.Column="0"
+                                               Text=">_"
+                                               FontFamily="Cascadia Code, Consolas, Courier New"
+                                               FontSize="11"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               Margin="0,0,6,0"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"/>
+
+                                    <!-- Tab name -->
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Header}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               FontSize="12"/>
+
+                                    <!-- Close ✕ (visible on hover only) -->
+                                    <Button x:Name="CloseBtn"
+                                            Grid.Column="2"
+                                            Content="✕"
+                                            Style="{StaticResource TabCloseButton}"
+                                            Tag="{Binding}"
+                                            Click="CloseTab_Click"
+                                            Margin="6,0,0,0"
+                                            Visibility="Hidden"
+                                            WindowChrome.IsHitTestVisibleInChrome="True"
+                                            ToolTip="Close tab"/>
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Value="True">
+                                        <DataTrigger.Binding>
+                                            <Binding RelativeSource="{RelativeSource AncestorType=ListBoxItem}"
+                                                     Path="IsMouseOver"/>
+                                        </DataTrigger.Binding>
+                                        <Setter TargetName="CloseBtn" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- "+" button + dropdown popup -->
+                    <Grid DockPanel.Dock="Left"
+                          VerticalAlignment="Center"
+                          Margin="4,0,0,0">
+                        <Button x:Name="ConnectBtn"
+                                Style="{StaticResource TitleBarButton}"
+                                Click="ConnectBtn_Click"
+                                WindowChrome.IsHitTestVisibleInChrome="True"
+                                Padding="8,6"
+                                ToolTip="Open a connection">
+                            <!-- White "+" new-tab icon -->
+                            <TextBlock Text="+"
+                                       FontSize="18"
+                                       FontWeight="Light"
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       Margin="0,-1,0,0"/>
+                        </Button>
+                        <Popup x:Name="ConnectPopup"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding ElementName=ConnectBtn}"
+                               StaysOpen="False">
+                            <Border Background="{StaticResource SurfaceBrush}"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1"
+                                    MinWidth="240"
+                                    Padding="0,4">
+                                <StackPanel>
+                                    <TextBlock Text="Connections"
+                                               Foreground="{StaticResource ForegroundDimBrush}"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Padding="14,4,14,6"/>
+                                    <ItemsControl ItemsSource="{Binding ConnectionManager.Connections}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Tag="{Binding}"
+                                                        Click="ConnectItem_Click"
+                                                        Style="{StaticResource ConnectPopupItem}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text=">_"
+                                                                   FontFamily="Cascadia Code, Consolas, Courier New"
+                                                                   FontSize="11"
+                                                                   Foreground="{StaticResource AccentBrush}"
+                                                                   Margin="0,0,10,0"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <!-- Placeholder when no connections configured -->
+                                    <TextBlock Text="No connections configured."
+                                               Foreground="{StaticResource ForegroundDimBrush}"
+                                               FontSize="11"
+                                               Padding="14,6"
+                                               Visibility="{Binding ConnectionManager.Connections.Count,
+                                                   Converter={StaticResource ZeroCountToVisConverter}}"/>
+                                    <Separator Margin="0,4"/>
+                                    <Button Content="Manage Connections…"
+                                            Style="{StaticResource ConnectPopupItem}"
+                                            Foreground="{StaticResource ForegroundDimBrush}"
+                                            Click="ManageConnections_Click"/>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </DockPanel>
+
+                <!-- Right: settings + window controls (no status text) -->
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Stretch"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+
+                    <!-- Settings gear (orange) -->
+                    <Button Style="{StaticResource TitleBarButton}"
+                            Click="Settings_Click"
+                            Padding="10,6"
+                            Margin="0,0,8,0"
+                            ToolTip="Settings">
+                        <TextBlock Text="⚙"
+                                   FontSize="15"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   VerticalAlignment="Center"/>
+                    </Button>
+
+                    <!-- Minimize -->
+                    <Button Style="{StaticResource WinControlButton}"
+                            Click="Minimize_Click"
+                            ToolTip="Minimize">
+                        <TextBlock Text="&#xE921;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="10"/>
+                    </Button>
+
+                    <!-- Maximize / Restore -->
+                    <Button x:Name="MaxRestoreBtn"
+                            Style="{StaticResource WinControlButton}"
+                            Click="MaximizeRestore_Click"
+                            ToolTip="Maximize">
+                        <TextBlock x:Name="MaxRestoreIcon"
+                                   Text="&#xE922;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="10"/>
+                    </Button>
+
+                    <!-- Close -->
+                    <Button Style="{StaticResource WinCloseButton}"
+                            Click="CloseWindow_Click"
+                            ToolTip="Close">
+                        <TextBlock Text="&#xE8BB;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="11"/>
+                    </Button>
+                </StackPanel>
             </Grid>
 
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
-                          ResizeBehavior="PreviousAndNext"/>
+            <!-- ════════════ CONTENT AREA ════════════ -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="300"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="480" MinWidth="300"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- RIGHT: AI Chat + Wiki tabs -->
-            <TabControl Grid.Column="2"
-                        SelectedIndex="{Binding RightTabIndex, Mode=TwoWay}"
-                        Background="{StaticResource SurfaceBrush}">
-                <TabItem Header="AI Chat">
-                    <views:AiChatView DataContext="{Binding AiChat}"/>
-                </TabItem>
-                <TabItem Header="Wiki">
-                    <views:WikiView DataContext="{Binding Wiki}"/>
-                </TabItem>
-            </TabControl>
+                <!-- Active terminal content -->
+                <Grid Grid.Column="0">
+                    <!-- Welcome placeholder (shown when no tabs are open) -->
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding ActiveTerminalTab,
+                                    Converter={StaticResource NullToVisInvertConverter}}">
+                        <TextBlock Text="⚡ PowerTerminal"
+                                   FontSize="28" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,14"/>
+                        <TextBlock Text="Click + to open a connection"
+                                   Foreground="{StaticResource ForegroundDimBrush}"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Terminal view for the active tab -->
+                    <ContentControl Content="{Binding ActiveTerminalTab}"
+                                    Visibility="{Binding ActiveTerminalTab,
+                                        Converter={StaticResource NullToVisConverter}}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
+                                <views:TerminalTabView/>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </Grid>
+
+                <!-- Splitter -->
+                <GridSplitter Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              ResizeBehavior="PreviousAndNext"/>
+
+                <!-- RIGHT: AI Chat + Wiki tabs -->
+                <TabControl Grid.Column="2"
+                            SelectedIndex="{Binding RightTabIndex, Mode=TwoWay}"
+                            Background="{StaticResource SurfaceBrush}">
+                    <TabItem Header="AI Chat">
+                        <views:AiChatView DataContext="{Binding AiChat}"/>
+                    </TabItem>
+                    <TabItem Header="Wiki">
+                        <views:WikiView DataContext="{Binding Wiki}"/>
+                    </TabItem>
+                </TabControl>
+            </Grid>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,11 +38,17 @@ namespace PowerTerminal.Services
         /// <summary>
         /// Optional callback invoked during keyboard-interactive authentication.
         /// Receives the prompt text (e.g. "Password: ") and returns the user's response.
-        /// Must be set before <see cref="ConnectAsync"/> is called when no private key is configured;
-        /// if left null the keyboard-interactive method is not added and connection will fail on
-        /// password-protected servers.
         /// </summary>
         public Func<string, string>? PasswordPrompt { get; set; }
+
+        /// <summary>
+        /// Global folder to search for SSH private key files (id_rsa, id_ed25519, …).
+        /// Set from <see cref="AppSettings.SshKeysFolder"/> before calling
+        /// <see cref="ConnectAsync"/>.
+        /// </summary>
+        public string SshKeysFolder { get; set; } =
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
 
         public async Task ConnectAsync(SshConnection connection)
         {
@@ -53,11 +61,14 @@ namespace PowerTerminal.Services
             {
                 var authMethods = new List<AuthenticationMethod>();
 
-                if (!string.IsNullOrWhiteSpace(connection.PrivateKeyPath))
+                // Try to load a matching private key from the global SSH keys folder.
+                var keyFile = FindPrivateKeyForHost(connection.Host, connection.Username);
+                if (keyFile != null)
                 {
+                    _log.LogTerminalEvent(_sessionName, $"Using private key: {keyFile}");
                     authMethods.Add(new PrivateKeyAuthenticationMethod(
                         connection.Username,
-                        new PrivateKeyFile(connection.PrivateKeyPath)));
+                        new PrivateKeyFile(keyFile)));
                 }
                 else if (PasswordPrompt != null)
                 {
@@ -72,8 +83,9 @@ namespace PowerTerminal.Services
                 }
                 else
                 {
-                    // No key and no prompt handler: fall back to none-auth for key-free servers.
-                    authMethods.Add(new NoneAuthenticationMethod(connection.Username));
+                    throw new InvalidOperationException(
+                        "No authentication method available: configure SSH keys in the global keys folder " +
+                        "or ensure the server allows keyboard-interactive authentication.");
                 }
 
                 var connInfo = new ConnectionInfo(
@@ -99,6 +111,74 @@ namespace PowerTerminal.Services
             await GatherMachineInfoAsync();
         }
 
+        /// <summary>
+        /// Searches <see cref="SshKeysFolder"/> for a private key suitable for
+        /// <paramref name="host"/>. Checks in order:
+        /// <list type="number">
+        ///   <item>A file named exactly after the host (e.g. <c>myserver</c>)</item>
+        ///   <item>Any key listed in <c>known_hosts</c> that matches the host</item>
+        ///   <item>The conventional default keys: id_ed25519, id_rsa, id_ecdsa, id_dsa</item>
+        /// </list>
+        /// Returns <c>null</c> if no readable key is found.
+        /// </summary>
+        private string? FindPrivateKeyForHost(string host, string username)
+        {
+            if (!Directory.Exists(SshKeysFolder)) return null;
+
+            // Helper: test whether a candidate file looks like a readable private key.
+            static bool IsPrivateKey(string path)
+            {
+                if (!File.Exists(path)) return false;
+                try
+                {
+                    // A private key file starts with "-----BEGIN"
+                    using var sr = new StreamReader(path);
+                    var firstLine = sr.ReadLine() ?? string.Empty;
+                    return firstLine.StartsWith("-----BEGIN", StringComparison.Ordinal);
+                }
+                catch { return false; }
+            }
+
+            // 1. File named after the host
+            var byHost = Path.Combine(SshKeysFolder, host);
+            if (IsPrivateKey(byHost)) return byHost;
+
+            // 2. Walk known_hosts and return the first private key that corresponds
+            //    to a known pattern (the key files themselves must exist alongside it).
+            var knownHosts = Path.Combine(SshKeysFolder, "known_hosts");
+            if (File.Exists(knownHosts))
+            {
+                foreach (var line in File.ReadLines(knownHosts))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+                    var parts = line.Split(' ', 2);
+                    if (parts.Length < 1) continue;
+                    var hostPart = parts[0];
+                    if (hostPart.Split(',').Any(h =>
+                            h.Equals(host, StringComparison.OrdinalIgnoreCase) ||
+                            h.Equals($"[{host}]", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        // Host is known – try conventional key names
+                        foreach (var name in new[] { "id_ed25519", "id_rsa", "id_ecdsa", "id_dsa" })
+                        {
+                            var candidate = Path.Combine(SshKeysFolder, name);
+                            if (IsPrivateKey(candidate)) return candidate;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // 3. Fall back to conventional default key names
+            foreach (var name in new[] { "id_ed25519", "id_rsa", "id_ecdsa", "id_dsa" })
+            {
+                var candidate = Path.Combine(SshKeysFolder, name);
+                if (IsPrivateKey(candidate)) return candidate;
+            }
+
+            return null;
+        }
+
         public void SendData(string data)
         {
             if (_shellStream == null || !IsConnected) return;
@@ -110,8 +190,6 @@ namespace PowerTerminal.Services
         public void Resize(uint columns, uint rows)
         {
             if (_shellStream == null) return;
-            // Access the underlying channel via reflection to send window change request.
-            // IChannelSession is internal in SSH.NET so we use dynamic dispatch.
             try
             {
                 var channelField = _shellStream.GetType()
@@ -124,10 +202,7 @@ namespace PowerTerminal.Services
                     method?.Invoke(channel, new object[] { columns, rows, columns * 8u, rows * 16u });
                 }
             }
-            catch
-            {
-                // Resize not critical – ignore if unavailable
-            }
+            catch { }
         }
 
         private void StartReading()

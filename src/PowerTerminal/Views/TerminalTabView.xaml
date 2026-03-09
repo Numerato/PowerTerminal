@@ -4,39 +4,9 @@
              xmlns:ctrl="clr-namespace:PowerTerminal.Controls"
              Background="{StaticResource BackgroundBrush}">
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- Terminal output -->
+        <!-- Terminal output fills the entire area; no status bar -->
         <ctrl:TerminalControl x:Name="Terminal"
-                              Grid.Row="0"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Auto"/>
-
-        <!-- Status bar -->
-        <Border Grid.Row="1"
-                Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="8,3">
-            <DockPanel>
-                <Ellipse Width="8" Height="8"
-                         Fill="{Binding IsConnected, Converter={StaticResource BoolToColorBrushConverter}}"
-                         Margin="0,0,6,0" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding StatusText}"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           FontSize="11" VerticalAlignment="Center"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                    <TextBlock Text="{Binding OsVersion}"
-                               Foreground="{StaticResource ForegroundDimBrush}"
-                               FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBlock Text="{Binding IpAddress}"
-                               Foreground="{StaticResource ForegroundDimBrush}"
-                               FontSize="10" VerticalAlignment="Center"/>
-                </StackPanel>
-            </DockPanel>
-        </Border>
     </Grid>
 </UserControl>
