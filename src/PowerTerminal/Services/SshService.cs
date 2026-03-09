@@ -84,6 +84,17 @@ namespace PowerTerminal.Services
                 // for a password when no key is available or when key auth is rejected.
                 if (PasswordPrompt != null)
                 {
+                    // When there is no private key, prompt for the password before calling Connect()
+                    // so we can populate PasswordAuthenticationMethod (needed for servers that
+                    // advertise "password" auth but not "keyboard-interactive").
+                    if (keyFile == null)
+                    {
+                        var pw = PasswordPrompt($"Password for {connection.Username}@{connection.Host}: ");
+                        if (!string.IsNullOrEmpty(pw))
+                            authMethods.Add(new PasswordAuthenticationMethod(connection.Username, pw));
+                    }
+
+                    // Also add keyboard-interactive as a fallback for servers that support it.
                     var kia = new KeyboardInteractiveAuthenticationMethod(connection.Username);
                     kia.AuthenticationPrompt += (_, e) =>
                     {

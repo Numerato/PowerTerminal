@@ -10,7 +10,7 @@
         ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterOwner">
 
-    <Border BorderBrush="#555555"
+    <Border BorderBrush="#777777"
             BorderThickness="1"
             CornerRadius="8"
             Background="{StaticResource BackgroundBrush}"

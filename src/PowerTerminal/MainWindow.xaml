@@ -22,7 +22,7 @@
     </WindowChrome.WindowChrome>
 
     <!-- Outer border: 1 px subtle gray outline + 8 px rounded corners -->
-    <Border BorderBrush="#555555"
+    <Border BorderBrush="#777777"
             BorderThickness="1"
             CornerRadius="8"
             Background="{StaticResource BackgroundBrush}"
@@ -51,11 +51,11 @@
                                Foreground="{StaticResource AccentBrush}"
                                FontSize="18"
                                VerticalAlignment="Center"
-                               Margin="0,0,5,0"/>
+                               Margin="0,0,3,0"/>
                     <TextBlock Text="PowerTerminal"
-                               Foreground="{StaticResource ForegroundDimBrush}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="11"
+                               FontWeight="Bold"
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
