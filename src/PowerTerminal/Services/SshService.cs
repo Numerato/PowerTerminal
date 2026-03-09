@@ -59,19 +59,17 @@ namespace PowerTerminal.Services
 
             await Task.Run(() =>
             {
-                var authMethods = new List<AuthenticationMethod>();
-
-                // Try to load a matching private key from the global SSH keys folder.
-                // Wrap in try-catch: the key file may be passphrase-protected or unreadable.
+                // ── 1. Resolve private key once (shared across retry attempts) ────────
                 var keyFile = FindPrivateKeyForHost(connection.Host, connection.Username);
+                PrivateKeyAuthenticationMethod? pkAuth = null;
                 if (keyFile != null)
                 {
                     try
                     {
                         _log.LogTerminalEvent(_sessionName, $"Using private key: {keyFile}");
-                        authMethods.Add(new PrivateKeyAuthenticationMethod(
+                        pkAuth = new PrivateKeyAuthenticationMethod(
                             connection.Username,
-                            new PrivateKeyFile(keyFile)));
+                            new PrivateKeyFile(keyFile));
                     }
                     catch (Exception ex)
                     {
@@ -80,53 +78,82 @@ namespace PowerTerminal.Services
                     }
                 }
 
-                // Always add keyboard-interactive as a fallback so the server can prompt
-                // for a password when no key is available or when key auth is rejected.
-                if (PasswordPrompt != null)
+                // ── 2. Connection loop (retries apply only to password auth) ──────────
+                // When no private key is available and a password collector is wired up,
+                // allow up to 3 attempts, showing "Permission denied" between each.
+                // Key-based auth has no retry loop (key accepted or rejected once).
+                const int MaxPasswordAttempts = 3;
+                bool usePasswordRetry = pkAuth == null && PasswordPrompt != null;
+                int maxAttempts = usePasswordRetry ? MaxPasswordAttempts : 1;
+
+                for (int attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    // When there is no private key, prompt for the password before calling Connect()
-                    // so we can populate PasswordAuthenticationMethod (needed for servers that
-                    // advertise "password" auth but not "keyboard-interactive").
-                    if (keyFile == null)
+                    var authMethods = new List<AuthenticationMethod>();
+
+                    if (pkAuth != null)
                     {
-                        var pw = PasswordPrompt($"Password for {connection.Username}@{connection.Host}: ");
-                        if (!string.IsNullOrEmpty(pw))
-                            authMethods.Add(new PasswordAuthenticationMethod(connection.Username, pw));
+                        // Key available: try key, then keyboard-interactive as fallback
+                        authMethods.Add(pkAuth);
+                        if (PasswordPrompt != null)
+                        {
+                            var kia = new KeyboardInteractiveAuthenticationMethod(connection.Username);
+                            kia.AuthenticationPrompt += (_, e) =>
+                            {
+                                foreach (var p in e.Prompts)
+                                    p.Response = PasswordPrompt(p.Request);
+                            };
+                            authMethods.Add(kia);
+                        }
+                    }
+                    else if (PasswordPrompt != null)
+                    {
+                        // No key: prompt for password inline in the terminal.
+                        // Print "Permission denied" prefix on every retry after the first.
+                        string prefix = attempt > 1
+                            ? "\r\nPermission denied, please try again.\r\n"
+                            : string.Empty;
+                        var pw = PasswordPrompt(
+                            $"{prefix}Password for {connection.Username}@{connection.Host}: ");
+                        if (string.IsNullOrEmpty(pw))
+                            throw new OperationCanceledException("Password entry cancelled.");
+                        authMethods.Add(new PasswordAuthenticationMethod(connection.Username, pw));
                     }
 
-                    // Also add keyboard-interactive as a fallback for servers that support it.
-                    var kia = new KeyboardInteractiveAuthenticationMethod(connection.Username);
-                    kia.AuthenticationPrompt += (_, e) =>
+                    if (authMethods.Count == 0)
                     {
-                        foreach (var prompt in e.Prompts)
-                            prompt.Response = PasswordPrompt(prompt.Request);
+                        throw new InvalidOperationException(
+                            "No authentication method available: configure SSH keys in the global keys folder " +
+                            "or ensure a password can be collected.");
+                    }
+
+                    var connInfo = new ConnectionInfo(
+                        connection.Host,
+                        connection.Port,
+                        connection.Username,
+                        authMethods.ToArray());
+
+                    _client = new SshClient(connInfo);
+                    _client.ErrorOccurred += (s, e) =>
+                    {
+                        _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
+                        Disconnected?.Invoke(e.Exception);
                     };
-                    authMethods.Add(kia);
+
+                    try
+                    {
+                        _client.Connect();
+                        break; // success — exit the retry loop
+                    }
+                    catch (SshAuthenticationException) when (usePasswordRetry && attempt < maxAttempts)
+                    {
+                        // Wrong password — clean up and let the loop prompt again
+                        _client.Dispose();
+                        _client = null;
+                    }
                 }
 
-                if (authMethods.Count == 0)
-                {
-                    throw new InvalidOperationException(
-                        "No authentication method available: configure SSH keys in the global keys folder " +
-                        "or ensure the server allows keyboard-interactive authentication.");
-                }
-
-                var connInfo = new ConnectionInfo(
-                    connection.Host,
-                    connection.Port,
-                    connection.Username,
-                    authMethods.ToArray());
-
-                _client = new SshClient(connInfo);
-                _client.ErrorOccurred += (s, e) =>
-                {
-                    _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
-                    Disconnected?.Invoke(e.Exception);
-                };
-                _client.Connect();
-
-                _shellStream = _client.CreateShellStream(
-                    "xterm-256color", 220, 50, 1760, 400, 4096);
+                _shellStream = (_client ?? throw new InvalidOperationException("SSH client was not initialized."))
+                    .CreateShellStream("xterm-256color", 220, 50, 1760, 400, 4096);
             });
 
             _log.LogTerminalEvent(_sessionName, "Connected");

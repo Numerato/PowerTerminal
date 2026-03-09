@@ -66,11 +66,6 @@ namespace PowerTerminal.ViewModels
         public event Action? OpenSettingsRequested;
         public event Action<WikiEditorViewModel>? OpenWikiEditorRequested;
         public event Func<string, string?>? VariablePromptRequested;
-        /// <summary>
-        /// Raised on the UI thread to show a password prompt dialog.
-        /// Receives the server's prompt text; returns the entered password or null if cancelled.
-        /// </summary>
-        public event Func<string, string?>? PasswordPromptRequested;
 
         public ObservableCollection<TerminalTabViewModel> TerminalTabs { get; } = new();
 
@@ -125,11 +120,12 @@ namespace PowerTerminal.ViewModels
             var settings = _config.LoadSettings();
             var tab = new TerminalTabViewModel(_log)
             {
-                Connection             = conn,
-                Header                 = conn.Name,
-                AutoConnectOnLoad      = true,
-                SshKeysFolder          = settings.SshKeysFolder,
-                PasswordPromptRequested = prompt => PasswordPromptRequested?.Invoke(prompt)
+                Connection        = conn,
+                Header            = conn.Name,
+                AutoConnectOnLoad = true,
+                SshKeysFolder     = settings.SshKeysFolder,
+                // InlinePasswordCollector is wired by TerminalTabView.OnDataContextChanged
+                // when the tab's view is created — no popup dialog needed.
             };
             tab.TabCloseRequested += () => RemoveTab(tab);
             TerminalTabs.Add(tab);

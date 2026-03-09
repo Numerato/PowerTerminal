@@ -20,7 +20,6 @@ namespace PowerTerminal
             Vm.OpenSettingsRequested          += OpenSettings;
             Vm.OpenWikiEditorRequested        += OpenWikiEditor;
             Vm.VariablePromptRequested        += PromptVariable;
-            Vm.PasswordPromptRequested        += PromptPassword;
 
             StateChanged += (_, _) => UpdateMaxRestoreIcon();
         }
@@ -102,12 +101,6 @@ namespace PowerTerminal
         {
             var dlg = new VariablePromptWindow(name) { Owner = this };
             return dlg.ShowDialog() == true ? dlg.Value : null;
-        }
-
-        private string? PromptPassword(string prompt)
-        {
-            var dlg = new PasswordPromptWindow(prompt) { Owner = this };
-            return dlg.ShowDialog() == true ? dlg.Password : null;
         }
     }
 }

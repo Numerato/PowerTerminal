@@ -37,12 +37,12 @@ namespace PowerTerminal.ViewModels
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
 
         /// <summary>
-        /// Raised on the UI thread when a password prompt is needed.
-        /// The subscriber shows a dialog and returns the entered password,
-        /// or <c>null</c> if the user cancels.
-        /// Receives the server's prompt text as the argument.
+        /// Set by the View (TerminalTabView) to enable inline terminal password collection.
+        /// Called from a background SSH thread; the implementation must block until the user
+        /// submits the password (or cancels).  Receives the prompt text; returns the password
+        /// or an empty string if the user cancelled.
         /// </summary>
-        public Func<string, string?>? PasswordPromptRequested { get; set; }
+        public Func<string, string>? InlinePasswordCollector { get; set; }
 
         public TerminalTabViewModel(LoggingService log)
         {
@@ -138,17 +138,15 @@ namespace PowerTerminal.ViewModels
                     SshKeysFolder = SshKeysFolder
                 };
 
-                // Password prompt: show a modal dialog on the UI thread.
-                // The SSH.NET keyboard-interactive callback runs on a background thread,
-                // so we dispatch back to the UI thread and block until the user responds.
+                // Inline password prompt: the SSH background thread calls this callback,
+                // which blocks until the user types a password in the terminal and presses Enter.
                 _ssh.PasswordPrompt = prompt =>
                 {
-                    string password = string.Empty;
-                    Application.Current?.Dispatcher.Invoke(() =>
-                    {
-                        password = PasswordPromptRequested?.Invoke(prompt) ?? string.Empty;
-                    });
-                    return password;
+                    if (InlinePasswordCollector != null)
+                        return InlinePasswordCollector(prompt);
+                    // View not yet attached — log and abort so the caller gets a clear error.
+                    WriteToTerminal("\r\n\x1b[91mPassword prompt unavailable: terminal view not ready.\x1b[0m\r\n");
+                    return string.Empty;
                 };
 
                 _ssh.DataReceived += data => Application.Current?.Dispatcher.Invoke(() => TerminalDataReceived?.Invoke(data));

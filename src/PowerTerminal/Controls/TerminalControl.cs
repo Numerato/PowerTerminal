@@ -71,6 +71,10 @@ namespace PowerTerminal.Controls
         private bool _inOsc;
         private readonly StringBuilder _oscBuffer = new();
 
+        // ── Hidden-input mode (for inline password collection) ─────────────────
+        private Action<string>? _hiddenInputCallback;
+        private readonly StringBuilder _hiddenInputBuffer = new();
+
         private const int MaxParagraphs = 5000;
 
         public event Action<string>? UserInput;
@@ -106,14 +110,75 @@ namespace PowerTerminal.Controls
 
         // ── Input handling ────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Prints <paramref name="prompt"/> in the terminal and switches to hidden-input mode.
+        /// Every keystroke is accumulated without display until Enter is pressed, at which point
+        /// <paramref name="callback"/> is invoked with the collected text and normal mode resumes.
+        /// Escape and Ctrl+C cancel the collection and invoke <paramref name="callback"/> with
+        /// an empty string.  Must be called on the UI thread.
+        /// </summary>
+        public void CollectHiddenInput(string prompt, Action<string> callback)
+        {
+            _hiddenInputBuffer.Clear();
+            _hiddenInputCallback = callback;
+            AppendAnsiData(prompt);
+        }
+
         private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
         {
+            if (_hiddenInputCallback != null)
+            {
+                // Hidden mode: accumulate printable chars without echoing them
+                foreach (char ch in e.Text)
+                    if (ch >= ' ') // printable ASCII / Unicode (U+0020 and above)
+                        _hiddenInputBuffer.Append(ch);
+                e.Handled = true;
+                return;
+            }
             UserInput?.Invoke(e.Text);
             e.Handled = true;
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (_hiddenInputCallback != null)
+            {
+                bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+                switch (e.Key)
+                {
+                    case Key.Enter:
+                        var enterCb = _hiddenInputCallback;
+                        _hiddenInputCallback = null;
+                        AppendAnsiData("\r\n");
+                        enterCb(_hiddenInputBuffer.ToString());
+                        _hiddenInputBuffer.Clear();
+                        break;
+                    case Key.Back:
+                        if (_hiddenInputBuffer.Length > 0)
+                            _hiddenInputBuffer.Remove(_hiddenInputBuffer.Length - 1, 1);
+                        break;
+                    case Key.Escape:
+                        var escCb = _hiddenInputCallback;
+                        _hiddenInputCallback = null;
+                        AppendAnsiData("\r\n");
+                        escCb(string.Empty);
+                        _hiddenInputBuffer.Clear();
+                        break;
+                    default:
+                        if (ctrl && e.Key == Key.C)
+                        {
+                            var ctrlCCb = _hiddenInputCallback;
+                            _hiddenInputCallback = null;
+                            AppendAnsiData("^C\r\n");
+                            ctrlCCb(string.Empty);
+                            _hiddenInputBuffer.Clear();
+                        }
+                        break;
+                }
+                e.Handled = true;
+                return;
+            }
+
             string? seq = KeyToSequence(e);
             if (seq != null)
             {

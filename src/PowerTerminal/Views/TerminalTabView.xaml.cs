@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using PowerTerminal.ViewModels;
@@ -29,6 +30,24 @@ namespace PowerTerminal.Views
                 _vm.TerminalDataReceived += OnTerminalData;
                 _vm.LocalOutput          += OnTerminalData;
                 Terminal.UserInput += s => _vm.SendData(s);
+
+                // Inline password collection: blocks the SSH background thread via MRE
+                // until the user types a password and presses Enter in the terminal.
+                _vm.InlinePasswordCollector = prompt =>
+                {
+                    var mre    = new ManualResetEventSlim(false);
+                    var result = string.Empty;
+                    Dispatcher.Invoke(() =>
+                    {
+                        Terminal.CollectHiddenInput(prompt, pw =>
+                        {
+                            result = pw;
+                            mre.Set();
+                        });
+                    });
+                    mre.Wait();
+                    return result;
+                };
 
                 // If the view is already in the visual tree (Loaded fired before DataContextChanged),
                 // trigger auto-connect here so the connection attempt is never missed.
