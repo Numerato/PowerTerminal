@@ -14,6 +14,12 @@ namespace PowerTerminal.Views
             Loaded += (_, _) => PasswordInput.Focus();
         }
 
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
+        }
+
         private void Connect_Click(object sender, RoutedEventArgs e)
         {
             Password     = PasswordInput.Password;

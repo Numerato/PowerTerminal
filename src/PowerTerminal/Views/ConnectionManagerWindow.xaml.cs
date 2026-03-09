@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Input;
 using Microsoft.Win32;
+using PowerTerminal.Models;
 using PowerTerminal.ViewModels;
 
 namespace PowerTerminal.Views
@@ -15,38 +15,49 @@ namespace PowerTerminal.Views
         {
             InitializeComponent();
             DataContext = vm;
-            PopulatePredefinedIcons();
+            SyncIconComboBox();
+            // Re-sync the icon ComboBox whenever a different connection is loaded into the editor
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ConnectionManagerViewModel.Editing))
+                    SyncIconComboBox();
+            };
         }
 
         private ConnectionManagerViewModel Vm => (ConnectionManagerViewModel)DataContext;
 
-        /// <summary>
-        /// Fills the predefined-icons grid with every PNG/ICO/JPG found in the
-        /// application's <c>icons/</c> folder (ships with the application).
-        /// </summary>
-        private void PopulatePredefinedIcons()
+        // ── Dark chrome ──────────────────────────────────────────────────────
+
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icons");
-            if (!Directory.Exists(iconsDir)) return;
-
-            var files = Directory
-                .GetFiles(iconsDir, "*.*")
-                .Where(f =>
-                {
-                    var ext = Path.GetExtension(f).ToLowerInvariant();
-                    return ext is ".png" or ".jpg" or ".jpeg" or ".ico";
-                })
-                .OrderBy(f => string.Equals(Path.GetFileName(f), "linux.png",
-                                            StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ThenBy(f => Path.GetFileName(f));
-
-            PredefinedIconsList.ItemsSource = files.ToList();
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
         }
 
-        private void PredefinedIcon_Click(object sender, RoutedEventArgs e)
+        private void CloseDialog_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is string path && Vm.Editing != null)
-                Vm.Editing.LogoPath = path;
+            DialogResult = false;
+            Close();
+        }
+
+        // ── Icon picker ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sync the ComboBox selection to match the current Editing.LogoPath.
+        /// Called when the dialog opens and when Editing changes.
+        /// </summary>
+        private void SyncIconComboBox()
+        {
+            if (Vm?.Editing == null) return;
+            var match = Vm.IconOptions.FirstOrDefault(o =>
+                string.Equals(o.Path, Vm.Editing.LogoPath, StringComparison.OrdinalIgnoreCase));
+            IconComboBox.SelectedItem = match;
+        }
+
+        private void IconComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (IconComboBox.SelectedItem is IconOption option && Vm.Editing != null)
+                Vm.Editing.LogoPath = option.Path;
         }
 
         private void BrowseLogo_Click(object sender, RoutedEventArgs e)
@@ -57,14 +68,29 @@ namespace PowerTerminal.Views
                 Filter = "Image files (*.png;*.jpg;*.jpeg;*.ico)|*.png;*.jpg;*.jpeg;*.ico|All files (*.*)|*.*"
             };
             if (dlg.ShowDialog() == true && Vm.Editing != null)
+            {
                 Vm.Editing.LogoPath = dlg.FileName;
+                // If the file is in the icons folder, try to select it in the combo
+                SyncIconComboBox();
+            }
         }
 
-        private void ClearLogo_Click(object sender, RoutedEventArgs e)
+        // ── Save with confirmation ───────────────────────────────────────────
+
+        private void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (Vm.Editing != null)
-                Vm.Editing.LogoPath = null;
+            if (Vm.Editing == null) return;
+            var confirm = new DarkConfirmWindow(
+                "Save Connection",
+                $"Save changes to \"{Vm.Editing.Name}\"?")
+            {
+                Owner = this
+            };
+            if (confirm.ShowDialog() == true)
+                Vm.SaveCommand.Execute(null);
         }
+
+        // ── Connect / close ──────────────────────────────────────────────────
 
         private void Connect_Click(object sender, RoutedEventArgs e)
         {

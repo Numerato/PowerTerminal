@@ -14,6 +14,12 @@ namespace PowerTerminal.Views
             Loaded += (_, _) => ValueInput.Focus();
         }
 
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
+        }
+
         private void OK_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;

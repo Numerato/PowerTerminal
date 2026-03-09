@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using Microsoft.Win32;
 using PowerTerminal.Services;
 
@@ -14,6 +15,12 @@ namespace PowerTerminal.Views
         {
             InitializeComponent();
             LoadSettings();
+        }
+
+        private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
         }
 
         private void LoadSettings()
@@ -53,17 +60,15 @@ namespace PowerTerminal.Views
 
         private void BrowseSshFolder_Click(object sender, RoutedEventArgs e)
         {
-            // WPF has no FolderBrowserDialog — use OpenFileDialog trick
             var dlg = new OpenFileDialog
             {
-                Title            = "Select SSH Keys Folder",
-                Filter           = "Folders|*.none",
-                CheckFileExists  = false,
-                CheckPathExists  = true,
-                FileName         = "Select Folder",
-                ValidateNames    = false,
+                Title           = "Select SSH Keys Folder",
+                Filter          = "Folders|*.none",
+                CheckFileExists = false,
+                CheckPathExists = true,
+                FileName        = "Select Folder",
+                ValidateNames   = false
             };
-            // Pre-navigate to existing path if valid
             if (Directory.Exists(SshKeysFolderInput.Text))
                 dlg.InitialDirectory = SshKeysFolderInput.Text;
             if (dlg.ShowDialog() == true)

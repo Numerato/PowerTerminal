@@ -196,7 +196,6 @@
                                     <Separator Margin="0,4"/>
                                     <Button Content="Manage Connections…"
                                             Style="{StaticResource ConnectPopupItem}"
-                                            Foreground="{StaticResource ForegroundDimBrush}"
                                             Click="ManageConnections_Click"/>
                                 </StackPanel>
                             </Border>

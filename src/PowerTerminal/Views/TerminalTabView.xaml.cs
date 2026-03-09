@@ -29,6 +29,14 @@ namespace PowerTerminal.Views
                 _vm.TerminalDataReceived += OnTerminalData;
                 _vm.LocalOutput          += OnTerminalData;
                 Terminal.UserInput += s => _vm.SendData(s);
+
+                // If the view is already in the visual tree (Loaded fired before DataContextChanged),
+                // trigger auto-connect here so the connection attempt is never missed.
+                if (IsLoaded && _vm.AutoConnectOnLoad)
+                {
+                    _vm.AutoConnectOnLoad = false;
+                    _ = _vm.ConnectAsync();
+                }
             }
         }
 
