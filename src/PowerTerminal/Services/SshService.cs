@@ -62,13 +62,22 @@ namespace PowerTerminal.Services
                 var authMethods = new List<AuthenticationMethod>();
 
                 // Try to load a matching private key from the global SSH keys folder.
+                // Wrap in try-catch: the key file may be passphrase-protected or unreadable.
                 var keyFile = FindPrivateKeyForHost(connection.Host, connection.Username);
                 if (keyFile != null)
                 {
-                    _log.LogTerminalEvent(_sessionName, $"Using private key: {keyFile}");
-                    authMethods.Add(new PrivateKeyAuthenticationMethod(
-                        connection.Username,
-                        new PrivateKeyFile(keyFile)));
+                    try
+                    {
+                        _log.LogTerminalEvent(_sessionName, $"Using private key: {keyFile}");
+                        authMethods.Add(new PrivateKeyAuthenticationMethod(
+                            connection.Username,
+                            new PrivateKeyFile(keyFile)));
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogTerminalEvent(_sessionName,
+                            $"Could not load private key '{keyFile}': {ex.Message}. Falling back to password auth.");
+                    }
                 }
 
                 // Always add keyboard-interactive as a fallback so the server can prompt

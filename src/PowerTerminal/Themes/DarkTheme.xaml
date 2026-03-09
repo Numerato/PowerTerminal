@@ -534,7 +534,7 @@
         <Setter Property="FontSize"   Value="12"/>
     </Style>
 
-    <!-- PasswordBox dark -->
+    <!-- PasswordBox dark (custom template ensures dark bg/fg are honoured) -->
     <Style TargetType="PasswordBox">
         <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
         <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
@@ -544,6 +544,49 @@
         <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
         <Setter Property="FontSize"        Value="13"/>
         <Setter Property="CaretBrush"      Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="SelectionBrush"  Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ToolTip dark style -->
+    <Style TargetType="ToolTip">
+        <Setter Property="Background"      Value="{StaticResource SurfaceHighBrush}"/>
+        <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding"         Value="8,5"/>
+        <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"        Value="12"/>
+        <Setter Property="HasDropShadow"   Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>
