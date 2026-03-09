@@ -192,6 +192,7 @@ namespace PowerTerminal.Controls
             if (_hiddenInputCallback != null)
             {
                 bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+                bool alt  = (e.KeyboardDevice.Modifiers & ModifierKeys.Alt)     != 0;
                 switch (e.Key)
                 {
                     case Key.Enter:
@@ -200,10 +201,12 @@ namespace PowerTerminal.Controls
                         AppendAnsiData("\r\n");
                         enterCb(_hiddenInputBuffer.ToString());
                         _hiddenInputBuffer.Clear();
+                        e.Handled = true;
                         break;
                     case Key.Back:
                         if (_hiddenInputBuffer.Length > 0)
                             _hiddenInputBuffer.Remove(_hiddenInputBuffer.Length - 1, 1);
+                        e.Handled = true;
                         break;
                     case Key.Escape:
                         var escCb = _hiddenInputCallback;
@@ -211,6 +214,7 @@ namespace PowerTerminal.Controls
                         AppendAnsiData("\r\n");
                         escCb(string.Empty);
                         _hiddenInputBuffer.Clear();
+                        e.Handled = true;
                         break;
                     default:
                         if (ctrl && e.Key == Key.C)
@@ -220,10 +224,21 @@ namespace PowerTerminal.Controls
                             AppendAnsiData("^C\r\n");
                             ctrlCCb(string.Empty);
                             _hiddenInputBuffer.Clear();
+                            e.Handled = true;
                         }
+                        else if (ctrl || alt)
+                        {
+                            // Suppress other modifier combinations (Ctrl+Z, Alt+F4, etc.)
+                            // so they don't accidentally trigger RichTextBox commands while
+                            // the user is typing a password.
+                            e.Handled = true;
+                        }
+                        // Plain printable key: do NOT set e.Handled here.
+                        // WPF will generate a WM_CHAR message which fires PreviewTextInput,
+                        // and OnPreviewTextInput will buffer the character.  Setting
+                        // e.Handled = true here would suppress WM_CHAR and break buffering.
                         break;
                 }
-                e.Handled = true;
                 return;
             }
 
