@@ -16,6 +16,7 @@ namespace PowerTerminal.ViewModels
         private readonly LoggingService _log;
         private SshService? _ssh;
         private string _header = "Terminal";
+        private bool _isActive;
         private bool _isConnected;
         private bool _isConnecting;
         private string _statusText = "Disconnected";
@@ -69,11 +70,27 @@ namespace PowerTerminal.ViewModels
         /// MainViewModel subscribes to this event to remove the tab from the collection.
         /// </summary>
         public event Action? TabCloseRequested;
+        /// <summary>
+        /// Raised at the start of <see cref="ConnectAsync"/> so the View can clear the terminal
+        /// before showing new connection output.
+        /// </summary>
+        public event Action? ClearRequested;
 
         public string Header
         {
             get => _header;
             set => Set(ref _header, value);
+        }
+
+        /// <summary>
+        /// True when this tab is currently the active (visible) tab in the UI.
+        /// Set by <see cref="MainViewModel"/> when <see cref="MainViewModel.ActiveTerminalTab"/> changes.
+        /// The view binds <c>Visibility</c> to this property so only the active tab's terminal is visible.
+        /// </summary>
+        public bool IsActive
+        {
+            get => _isActive;
+            set => Set(ref _isActive, value);
         }
 
         public bool IsConnected
@@ -125,6 +142,9 @@ namespace PowerTerminal.ViewModels
         public async Task ConnectAsync()
         {
             if (Connection == null) return;
+
+            // Clear the terminal and start fresh for this connection attempt
+            ClearRequested?.Invoke();
 
             IsConnecting = true;
             StatusText = $"Connecting to {Connection.Host}…";

@@ -75,7 +75,12 @@ namespace PowerTerminal.ViewModels
             set
             {
                 if (Set(ref _activeTerminalTab, value))
+                {
+                    // Keep IsActive in sync so each tab's TerminalTabView shows/hides itself
+                    foreach (var tab in TerminalTabs)
+                        tab.IsActive = (tab == value);
                     Wiki.ActiveTerminal = value;
+                }
             }
         }
 

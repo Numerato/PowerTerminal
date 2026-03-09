@@ -282,16 +282,24 @@
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- Terminal view for the active tab -->
-                    <ContentControl Content="{Binding ActiveTerminalTab}"
-                                    Visibility="{Binding ActiveTerminalTab,
-                                        Converter={StaticResource NullToVisConverter}}">
-                        <ContentControl.ContentTemplate>
+                    <!-- One persistent TerminalTabView per tab VM.
+                         Only the active tab's view is Visible; the rest are Collapsed so they
+                         remain in memory (preserving terminal history and SSH state) but take
+                         no layout space and receive no keyboard events. -->
+                    <ItemsControl ItemsSource="{Binding TerminalTabs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Grid/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
-                                <views:TerminalTabView/>
+                                <views:TerminalTabView
+                                    Visibility="{Binding IsActive,
+                                        Converter={StaticResource BoolToVisConverter}}"/>
                             </DataTemplate>
-                        </ContentControl.ContentTemplate>
-                    </ContentControl>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </Grid>
 
                 <!-- Splitter -->

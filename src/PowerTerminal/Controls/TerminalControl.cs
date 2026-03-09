@@ -75,6 +75,12 @@ namespace PowerTerminal.Controls
         private Action<string>? _hiddenInputCallback;
         private readonly StringBuilder _hiddenInputBuffer = new();
 
+        // ── Blinking cursor ───────────────────────────────────────────────────
+        private readonly Run _cursorRun;
+        private readonly System.Windows.Threading.DispatcherTimer _cursorTimer;
+        private bool _cursorVisible = true;
+        private const int CursorBlinkIntervalMs = 530;
+
         private const int MaxParagraphs = 5000;
 
         public event Action<string>? UserInput;
@@ -94,13 +100,42 @@ namespace PowerTerminal.Controls
             Document.LineHeight = 2;
             Document.Blocks.Clear();
             _currentParagraph.Margin = new Thickness(0);
+
+            // Blinking block cursor — always kept as the last inline of _currentParagraph
+            _cursorRun = new Run("▋")
+            {
+                Foreground = new SolidColorBrush(Color.FromRgb(204, 204, 204)),
+                FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New"),
+                FontSize   = 13
+            };
+            _currentParagraph.Inlines.Add(_cursorRun);
             Document.Blocks.Add(_currentParagraph);
+
+            // Toggle cursor visibility every CursorBlinkIntervalMs
+            _cursorTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(CursorBlinkIntervalMs)
+            };
+            _cursorTimer.Tick += OnCursorTick;
+            _cursorTimer.Start();
+
+            Unloaded += OnControlUnloaded;
+            Loaded   += OnControlLoaded;
 
             PreviewKeyDown   += OnPreviewKeyDown;
             PreviewTextInput += OnPreviewTextInput;
 
             Focusable = true;
         }
+
+        private void OnCursorTick(object? sender, EventArgs e)
+        {
+            _cursorVisible = !_cursorVisible;
+            _cursorRun.Text = _cursorVisible ? "▋" : "";
+        }
+
+        private void OnControlUnloaded(object sender, RoutedEventArgs e) => _cursorTimer.Stop();
+        private void OnControlLoaded(object sender, RoutedEventArgs e)   => _cursorTimer.Start();
 
         private void UpdateFont()
         {
@@ -122,6 +157,19 @@ namespace PowerTerminal.Controls
             _hiddenInputBuffer.Clear();
             _hiddenInputCallback = callback;
             AppendAnsiData(prompt);
+        }
+
+        /// <summary>
+        /// Cancels any in-progress hidden-input collection, invoking the pending callback
+        /// with an empty string so that the waiting SSH background thread is unblocked.
+        /// Safe to call from the UI thread at any time.
+        /// </summary>
+        public void CancelHiddenInput()
+        {
+            var cb = _hiddenInputCallback;
+            _hiddenInputCallback = null;
+            _hiddenInputBuffer.Clear();
+            cb?.Invoke(string.Empty);
         }
 
         private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -244,6 +292,7 @@ namespace PowerTerminal.Controls
             {
                 Document.Blocks.Clear();
                 _currentParagraph = new Paragraph { Margin = new Thickness(0) };
+                _currentParagraph.Inlines.Add(_cursorRun);
                 Document.Blocks.Add(_currentParagraph);
             });
         }
@@ -294,7 +343,10 @@ namespace PowerTerminal.Controls
                     // Carriage return – handled with \n
                     break;
                 case '\n':
+                    // Move cursor to the new paragraph
+                    _currentParagraph.Inlines.Remove(_cursorRun);
                     _currentParagraph = new Paragraph { Margin = new Thickness(0) };
+                    _currentParagraph.Inlines.Add(_cursorRun);
                     Document.Blocks.Add(_currentParagraph);
                     break;
                 case '\x07':                  // Bell – ignore
@@ -461,6 +513,8 @@ namespace PowerTerminal.Controls
 
         private void AppendChar(char ch)
         {
+            // Keep cursor as the last inline — insert new content before it
+            _currentParagraph.Inlines.Remove(_cursorRun);
             var run = new Run(ch.ToString())
             {
                 Foreground  = _fg,
@@ -471,18 +525,30 @@ namespace PowerTerminal.Controls
                 FontSize    = FontSize
             };
             _currentParagraph.Inlines.Add(run);
+            _currentParagraph.Inlines.Add(_cursorRun);
         }
 
         private void RemoveLastChar()
         {
+            // Temporarily remove cursor to expose the last real character
+            bool hadCursor = _currentParagraph.Inlines.LastInline == _cursorRun;
+            if (hadCursor) _currentParagraph.Inlines.Remove(_cursorRun);
+
             if (_currentParagraph.Inlines.LastInline is Run r && r.Text.Length > 0)
                 r.Text = r.Text.Substring(0, r.Text.Length - 1);
+
+            if (hadCursor) _currentParagraph.Inlines.Add(_cursorRun);
         }
 
         private void TrimHistory()
         {
             while (Document.Blocks.Count > MaxParagraphs)
-                Document.Blocks.Remove(Document.Blocks.FirstBlock);
+            {
+                var first = Document.Blocks.FirstBlock;
+                // Always keep at least one paragraph (the current one that holds the cursor)
+                if (Document.Blocks.Count <= 1) break;
+                Document.Blocks.Remove(first);
+            }
         }
 
         private static Color Get256Color(int idx)
