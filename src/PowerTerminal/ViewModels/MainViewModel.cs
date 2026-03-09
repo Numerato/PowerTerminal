@@ -87,16 +87,7 @@ namespace PowerTerminal.ViewModels
 
         private void LoadDefaultTabs()
         {
-            var connections = _config.LoadConnections();
-            if (connections.Count > 0)
-            {
-                foreach (var conn in connections)
-                    AddTabForConnection(conn);
-            }
-            else
-            {
-                AddNewTab();
-            }
+            // Tabs are opened on demand via the Connect dropdown in the title bar.
         }
 
         public TerminalTabViewModel AddNewTab()
@@ -119,16 +110,40 @@ namespace PowerTerminal.ViewModels
             return tab;
         }
 
+        /// <summary>
+        /// Creates a new tab for <paramref name="conn"/>, auto-connects on first load,
+        /// and wires <see cref="TerminalTabViewModel.TabCloseRequested"/> to remove the tab
+        /// when the SSH session ends.
+        /// </summary>
+        public void ConnectToConnection(SshConnection conn)
+        {
+            var tab = new TerminalTabViewModel(_log)
+            {
+                Connection        = conn,
+                Header            = conn.Name,
+                AutoConnectOnLoad = true
+            };
+            tab.TabCloseRequested += () => RemoveTab(tab);
+            TerminalTabs.Add(tab);
+            ActiveTerminalTab = tab;
+        }
+
+        /// <summary>Disconnects, disposes and removes a tab; activates the last remaining tab.</summary>
+        public void RemoveTab(TerminalTabViewModel tab)
+        {
+            if (!TerminalTabs.Contains(tab)) return;
+            tab.Disconnect();
+            tab.Dispose();
+            TerminalTabs.Remove(tab);
+            if (ActiveTerminalTab == tab)
+                ActiveTerminalTab = TerminalTabs.LastOrDefault();
+        }
+
         private void ConnectSelectedConnection()
         {
             var conn = ConnectionManager.Selected;
             if (conn == null) return;
-            // Open a new tab or use an existing disconnected tab
-            var tab = TerminalTabs.FirstOrDefault(t => !t.IsConnected && t.Connection?.Id == conn.Id)
-                   ?? AddTabForConnection(conn);
-            tab.Connection = conn;
-            tab.ConnectCommand.Execute(null);
-            ActiveTerminalTab = tab;
+            ConnectToConnection(conn);
         }
 
         private void OpenWikiEditorForNew()

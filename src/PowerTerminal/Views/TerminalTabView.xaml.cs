@@ -35,9 +35,12 @@ namespace PowerTerminal.Views
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             Terminal.Focus();
-            // Auto-connect if we have a connection
-            if (_vm?.Connection != null && !_vm.IsConnected && !_vm.IsConnecting)
+            // Auto-connect exactly once on first load (flag cleared immediately).
+            if (_vm?.AutoConnectOnLoad == true)
+            {
+                _vm.AutoConnectOnLoad = false;
                 _ = _vm.ConnectAsync();
+            }
         }
 
         private void OnTerminalData(string data)

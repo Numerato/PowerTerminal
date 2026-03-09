@@ -10,6 +10,7 @@ namespace PowerTerminal.Models
         public string Username { get; set; } = string.Empty;
         public int Port { get; set; } = 22;
         public string? PrivateKeyPath { get; set; }
+        public string? LogoPath { get; set; }
         public string? LastConnected { get; set; }
 
         public override string ToString() => $"{Name} ({Username}@{Host}:{Port})";

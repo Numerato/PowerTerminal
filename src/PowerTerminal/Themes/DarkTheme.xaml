@@ -3,40 +3,46 @@
                     xmlns:conv="clr-namespace:PowerTerminal.Converters">
 
     <!-- Value Converters -->
-    <conv:BoolToVisibilityConverter         x:Key="BoolToVisConverter"/>
-    <conv:BoolToInvisibilityConverter       x:Key="BoolToInvisConverter"/>
-    <conv:BoolToColorBrushConverter         x:Key="BoolToColorBrushConverter"/>
-    <conv:NullToBoolConverter               x:Key="NullToBoolConverter"/>
-    <conv:NullToVisibilityConverter         x:Key="NullToVisConverter"/>
-    <conv:NullToVisibilityInvertConverter   x:Key="NullToVisInvertConverter"/>
-    <conv:NullToStringConverter             x:Key="NullToStringConverter"/>
-    <conv:ListToStringConverter             x:Key="ListToStringConverter"/>
-    <conv:RoleToBackgroundConverter         x:Key="RoleToBackgroundConverter"/>
-    <conv:RoleToForegroundConverter         x:Key="RoleToForeConverter"/>
-    <conv:RoleToLabelConverter              x:Key="RoleToLabelConverter"/>
-    <conv:SectionTypeToColorConverter       x:Key="SectionTypeToColorConverter"/>
+    <conv:BoolToVisibilityConverter              x:Key="BoolToVisConverter"/>
+    <conv:BoolToInvisibilityConverter            x:Key="BoolToInvisConverter"/>
+    <conv:BoolToColorBrushConverter              x:Key="BoolToColorBrushConverter"/>
+    <conv:NullToBoolConverter                    x:Key="NullToBoolConverter"/>
+    <conv:NullToVisibilityConverter              x:Key="NullToVisConverter"/>
+    <conv:NullToVisibilityInvertConverter        x:Key="NullToVisInvertConverter"/>
+    <conv:NullOrEmptyToVisibilityConverter       x:Key="NullOrEmptyToVisConverter"/>
+    <conv:NullOrEmptyToVisibilityInvertConverter x:Key="NullOrEmptyToVisInvertConverter"/>
+    <conv:StringToImageSourceConverter           x:Key="StringToImageConverter"/>
+    <conv:ZeroCountToVisibilityConverter         x:Key="ZeroCountToVisConverter"/>
+    <conv:NullToStringConverter                  x:Key="NullToStringConverter"/>
+    <conv:ListToStringConverter                  x:Key="ListToStringConverter"/>
+    <conv:RoleToBackgroundConverter              x:Key="RoleToBackgroundConverter"/>
+    <conv:RoleToForegroundConverter              x:Key="RoleToForeConverter"/>
+    <conv:RoleToLabelConverter                   x:Key="RoleToLabelConverter"/>
+    <conv:SectionTypeToColorConverter            x:Key="SectionTypeToColorConverter"/>
 
     <!-- Color Palette -->
-    <Color x:Key="BackgroundColor">#0C0C0C</Color>
-    <Color x:Key="SurfaceColor">#1E1E1E</Color>
+    <Color x:Key="BackgroundColor">#000000</Color>
+    <Color x:Key="SurfaceColor">#1A1A1A</Color>
     <Color x:Key="SurfaceHighColor">#2D2D2D</Color>
+    <Color x:Key="TitleBarColor">#0A0A0A</Color>
     <Color x:Key="BorderColor">#3E3E3E</Color>
     <Color x:Key="ForegroundColor">#CCCCCC</Color>
     <Color x:Key="ForegroundDimColor">#888888</Color>
-    <Color x:Key="AccentColor">#0078D4</Color>
-    <Color x:Key="AccentHoverColor">#1A8AD4</Color>
-    <Color x:Key="AccentPressedColor">#005A9E</Color>
+    <Color x:Key="AccentColor">#E87722</Color>
+    <Color x:Key="AccentHoverColor">#F08830</Color>
+    <Color x:Key="AccentPressedColor">#C46010</Color>
     <Color x:Key="SuccessColor">#16C60C</Color>
     <Color x:Key="ErrorColor">#F25F5C</Color>
     <Color x:Key="WarningColor">#F9A825</Color>
-    <Color x:Key="SelectionColor">#264F78</Color>
-    <Color x:Key="TabActiveColor">#181818</Color>
-    <Color x:Key="TabInactiveColor">#252526</Color>
+    <Color x:Key="SelectionColor">#5C2800</Color>
+    <Color x:Key="TabActiveColor">#000000</Color>
+    <Color x:Key="TabInactiveColor">#0A0A0A</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="BackgroundBrush"       Color="{StaticResource BackgroundColor}"/>
     <SolidColorBrush x:Key="SurfaceBrush"          Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="SurfaceHighBrush"      Color="{StaticResource SurfaceHighColor}"/>
+    <SolidColorBrush x:Key="TitleBarBrush"         Color="{StaticResource TitleBarColor}"/>
     <SolidColorBrush x:Key="BorderBrush"           Color="{StaticResource BorderColor}"/>
     <SolidColorBrush x:Key="ForegroundBrush"       Color="{StaticResource ForegroundColor}"/>
     <SolidColorBrush x:Key="ForegroundDimBrush"    Color="{StaticResource ForegroundDimColor}"/>
@@ -109,6 +115,216 @@
         <Setter Property="Background"      Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding"         Value="4"/>
+    </Style>
+
+    <!-- ── Title bar button (transparent, rounded hover) ─────────────────── -->
+    <Style x:Key="TitleBarButton" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="10,6"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"        Value="12"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SurfaceHighBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentPressedBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Connect popup menu item ────────────────────────────────────────── -->
+    <Style x:Key="ConnectPopupItem" TargetType="Button">
+        <Setter Property="Background"                 Value="Transparent"/>
+        <Setter Property="Foreground"                 Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderThickness"            Value="0"/>
+        <Setter Property="Padding"                    Value="14,8"/>
+        <Setter Property="HorizontalAlignment"        Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Cursor"                     Value="Hand"/>
+        <Setter Property="FontFamily"                 Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"                   Value="13"/>
+        <Setter Property="FocusVisualStyle"           Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SurfaceHighBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource AccentPressedBrush}"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Window control buttons (min / max / restore) ──────────────────── -->
+    <Style x:Key="WinControlButton" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width"           Value="46"/>
+        <Setter Property="Height"          Value="44"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SurfaceHighBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Window close button (red on hover) ────────────────────────────── -->
+    <Style x:Key="WinCloseButton" TargetType="Button" BasedOn="{StaticResource WinControlButton}">
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#C42B1C"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="#A31F13"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Tab strip ×-close button (visible on parent hover) ────────────── -->
+    <Style x:Key="TabCloseButton" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="Foreground"      Value="{StaticResource ForegroundDimBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width"           Value="18"/>
+        <Setter Property="Height"          Value="18"/>
+        <Setter Property="Padding"         Value="0"/>
+        <Setter Property="FontSize"        Value="11"/>
+        <Setter Property="Cursor"          Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            CornerRadius="3">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SurfaceHighBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ── Tab strip ListBox (horizontal, no border/bg) ──────────────────── -->
+    <Style x:Key="TabStripListBox" TargetType="ListBox">
+        <Setter Property="Background"      Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding"         Value="0"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility"   Value="Disabled"/>
+        <Setter Property="VirtualizingPanel.IsVirtualizing"           Value="False"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <ScrollViewer Focusable="False"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <ItemsPresenter/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Tab strip item (each terminal tab in the title bar) ───────────── -->
+    <Style x:Key="TabStripItem" TargetType="ListBoxItem">
+        <Setter Property="Background"              Value="Transparent"/>
+        <Setter Property="Foreground"              Value="{StaticResource ForegroundDimBrush}"/>
+        <Setter Property="Padding"                 Value="12,0"/>
+        <Setter Property="Height"                  Value="44"/>
+        <Setter Property="Cursor"                  Value="Hand"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FocusVisualStyle"        Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <Rectangle x:Name="ActiveLine"
+                                   VerticalAlignment="Bottom"
+                                   Height="2"
+                                   Fill="{StaticResource AccentBrush}"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background"
+                                    Value="{StaticResource BackgroundBrush}"/>
+                            <Setter Property="Foreground"
+                                    Value="{StaticResource ForegroundBrush}"/>
+                            <Setter TargetName="ActiveLine" Property="Visibility"
+                                    Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background"
+                                    Value="{StaticResource SurfaceHighBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- TextBox dark style -->
@@ -244,11 +460,11 @@
 
     <!-- GridSplitter -->
     <Style TargetType="GridSplitter">
-        <Setter Property="Background"      Value="{StaticResource BorderBrush}"/>
-        <Setter Property="Width"           Value="4"/>
+        <Setter Property="Background"          Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Width"               Value="4"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment"   Value="Stretch"/>
-        <Setter Property="Cursor"          Value="SizeWE"/>
+        <Setter Property="Cursor"              Value="SizeWE"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{StaticResource AccentBrush}"/>

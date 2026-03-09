@@ -31,6 +31,23 @@ namespace PowerTerminal.Views
                 Vm.Editing.PrivateKeyPath = null;
         }
 
+        private void BrowseLogo_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title  = "Select tab logo image",
+                Filter = "Image files (*.png;*.jpg;*.jpeg;*.ico)|*.png;*.jpg;*.jpeg;*.ico|All files (*.*)|*.*"
+            };
+            if (dlg.ShowDialog() == true && Vm.Editing != null)
+                Vm.Editing.LogoPath = dlg.FileName;
+        }
+
+        private void ClearLogo_Click(object sender, RoutedEventArgs e)
+        {
+            if (Vm.Editing != null)
+                Vm.Editing.LogoPath = null;
+        }
+
         private void Connect_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = true;

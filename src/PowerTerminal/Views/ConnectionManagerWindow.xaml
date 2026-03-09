@@ -75,6 +75,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="120"/>
@@ -116,7 +117,27 @@
                             Click="ClearKey_Click"/>
                 </Grid>
 
-                <TextBlock Grid.Row="5" Grid.ColumnSpan="2"
+                <Label Grid.Row="5" Grid.Column="0" Content="Tab Logo:"/>
+                <Grid Grid.Row="5" Grid.Column="1" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0"
+                             Text="{Binding Editing.LogoPath, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,4,0"
+                             ToolTip="Path to a PNG/JPG/ICO image shown in the tab header (leave empty for default icon)"/>
+                    <Button Grid.Column="1" Content="Browse"
+                            Style="{StaticResource FlatButton}"
+                            Click="BrowseLogo_Click"
+                            Margin="0,0,4,0"/>
+                    <Button Grid.Column="2" Content="Clear"
+                            Style="{StaticResource FlatButton}"
+                            Click="ClearLogo_Click"/>
+                </Grid>
+
+                <TextBlock Grid.Row="6" Grid.ColumnSpan="2"
                            Text="Leave Private Key empty to authenticate with a password (you will be prompted on connect)."
                            Foreground="{StaticResource ForegroundDimBrush}"
                            FontSize="11"

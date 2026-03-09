@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using PowerTerminal.Models;
 
 namespace PowerTerminal.Converters
@@ -64,6 +65,54 @@ namespace PowerTerminal.Converters
             => throw new NotImplementedException();
     }
 
+    /// <summary>null or empty string → Collapsed, non-empty string → Visible</summary>
+    public class NullOrEmptyToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type t, object p, CultureInfo c)
+            => string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+        public object ConvertBack(object v, Type t, object p, CultureInfo c)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>null or empty string → Visible (fallback icon), non-empty → Collapsed</summary>
+    public class NullOrEmptyToVisibilityInvertConverter : IValueConverter
+    {
+        public object Convert(object value, Type t, object p, CultureInfo c)
+            => string.IsNullOrEmpty(value as string) ? Visibility.Visible : Visibility.Collapsed;
+        public object ConvertBack(object v, Type t, object p, CultureInfo c)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>Absolute or relative file path string → BitmapImage (returns null for missing/invalid paths)</summary>
+    public class StringToImageSourceConverter : IValueConverter
+    {
+        private static readonly HashSet<string> AllowedExtensions =
+            new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".ico", ".bmp", ".gif" };
+
+        public object? Convert(object value, Type t, object p, CultureInfo c)
+        {
+            if (value is not string path || string.IsNullOrEmpty(path)) return null;
+            var ext = System.IO.Path.GetExtension(path);
+            if (!AllowedExtensions.Contains(ext)) return null;
+            try
+            {
+                var uri = System.IO.Path.IsPathRooted(path)
+                    ? new Uri(path, UriKind.Absolute)
+                    : new Uri(path, UriKind.RelativeOrAbsolute);
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.UriSource   = uri;
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.EndInit();
+                img.Freeze();
+                return img;
+            }
+            catch { return null; }
+        }
+        public object ConvertBack(object v, Type t, object p, CultureInfo c)
+            => throw new NotImplementedException();
+    }
+
     /// <summary>null → parameter (first part) or second part of pipe-separated string</summary>
     public class NullToStringConverter : IValueConverter
     {
@@ -109,7 +158,7 @@ namespace PowerTerminal.Converters
         public object Convert(object value, Type t, object p, CultureInfo c) =>
             (value as string) switch
             {
-                "user"      => new SolidColorBrush(Color.FromRgb(86, 180, 233)),
+                "user"      => new SolidColorBrush(Color.FromRgb(232, 135, 34)),
                 "assistant" => new SolidColorBrush(Color.FromRgb(0, 183, 120)),
                 _           => new SolidColorBrush(Colors.Gray)
             };
@@ -138,9 +187,18 @@ namespace PowerTerminal.Converters
         public object Convert(object value, Type t, object p, CultureInfo c) =>
             value is WikiSectionType type
                 ? type == WikiSectionType.Command
-                    ? new SolidColorBrush(Color.FromRgb(0, 120, 180))
+                    ? new SolidColorBrush(Color.FromRgb(232, 119, 34))
                     : new SolidColorBrush(Color.FromRgb(60, 120, 60))
                 : (object)Brushes.Gray;
+        public object ConvertBack(object v, Type t, object p, CultureInfo c)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>int == 0 → Visible (empty-list placeholder), int > 0 → Collapsed</summary>
+    public class ZeroCountToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type t, object p, CultureInfo c)
+            => value is int n && n == 0 ? Visibility.Visible : Visibility.Collapsed;
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();
     }

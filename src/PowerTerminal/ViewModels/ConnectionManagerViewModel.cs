@@ -65,7 +65,8 @@ namespace PowerTerminal.ViewModels
                 Host           = Selected.Host,
                 Username       = Selected.Username,
                 Port           = Selected.Port,
-                PrivateKeyPath = Selected.PrivateKeyPath
+                PrivateKeyPath = Selected.PrivateKeyPath,
+                LogoPath       = Selected.LogoPath
             };
         }
 

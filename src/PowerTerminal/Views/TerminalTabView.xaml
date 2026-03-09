@@ -5,43 +5,18 @@
              Background="{StaticResource BackgroundBrush}">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Connection bar (shown when not connected) -->
-        <Border Grid.Row="0"
-                Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="8,4"
-                Visibility="{Binding IsConnected, Converter={StaticResource BoolToInvisConverter}}">
-            <DockPanel>
-                <TextBlock Text="Not connected"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,12,0"/>
-                <Button Content="Connect"
-                        Style="{StaticResource AccentButton}"
-                        Command="{Binding ConnectCommand}"
-                        HorizontalAlignment="Left"
-                        Margin="0,0,4,0"/>
-                <Button Content="Disconnect"
-                        Style="{StaticResource FlatButton}"
-                        Command="{Binding DisconnectCommand}"
-                        HorizontalAlignment="Left"/>
-            </DockPanel>
-        </Border>
-
         <!-- Terminal output -->
         <ctrl:TerminalControl x:Name="Terminal"
-                              Grid.Row="1"
+                              Grid.Row="0"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Auto"/>
 
         <!-- Status bar -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="1"
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"

@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using PowerTerminal.Models;
 using PowerTerminal.ViewModels;
 using PowerTerminal.Views;
 
@@ -19,19 +20,62 @@ namespace PowerTerminal
             Vm.OpenSettingsRequested          += OpenSettings;
             Vm.OpenWikiEditorRequested        += OpenWikiEditor;
             Vm.VariablePromptRequested        += PromptVariable;
+
+            StateChanged += (_, _) => UpdateMaxRestoreIcon();
         }
+
+        // ── Tab lifecycle ────────────────────────────────────────────────────
 
         private void CloseTab_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is TerminalTabViewModel tab)
-            {
-                tab.Disconnect();
-                tab.Dispose();
-                Vm.TerminalTabs.Remove(tab);
-                if (Vm.TerminalTabs.Count == 0)
-                    Vm.AddNewTab();
-            }
+                Vm.RemoveTab(tab);
         }
+
+        // ── Connect dropdown ─────────────────────────────────────────────────
+
+        private void ConnectBtn_Click(object sender, RoutedEventArgs e)
+        {
+            ConnectPopup.IsOpen = true;
+        }
+
+        private void ConnectItem_Click(object sender, RoutedEventArgs e)
+        {
+            ConnectPopup.IsOpen = false;
+            if (sender is Button btn && btn.Tag is SshConnection conn)
+                Vm.ConnectToConnection(conn);
+        }
+
+        private void ManageConnections_Click(object sender, RoutedEventArgs e)
+        {
+            ConnectPopup.IsOpen = false;
+            OpenConnectionManager();
+        }
+
+        // ── Title bar buttons ────────────────────────────────────────────────
+
+        private void Settings_Click(object sender, RoutedEventArgs e)
+            => Vm.OpenSettingsCommand.Execute(null);
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState.Minimized;
+
+        private void MaximizeRestore_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+
+        private void CloseWindow_Click(object sender, RoutedEventArgs e)
+            => Close();
+
+        private void UpdateMaxRestoreIcon()
+        {
+            bool maximized = WindowState == WindowState.Maximized;
+            MaxRestoreIcon.Text      = maximized ? "\uE923" : "\uE922";
+            MaxRestoreBtn.ToolTip    = maximized ? "Restore" : "Maximize";
+        }
+
+        // ── Dialog helpers ────────────────────────────────────────────────────
 
         private void OpenConnectionManager()
         {

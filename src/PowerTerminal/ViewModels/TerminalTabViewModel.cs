@@ -53,6 +53,11 @@ namespace PowerTerminal.ViewModels
         public event Action<string>? LocalOutput;
         /// <summary>Raised when connection state changes.</summary>
         public event Action? StateChanged;
+        /// <summary>
+        /// Raised on the UI thread when a connected SSH session ends (cleanly or with an error).
+        /// MainViewModel subscribes to this event to remove the tab from the collection.
+        /// </summary>
+        public event Action? TabCloseRequested;
 
         public string Header
         {
@@ -103,6 +108,9 @@ namespace PowerTerminal.ViewModels
         public string Uptime            => MachineInfo?.Uptime            ?? string.Empty;
         public string KernelVersion     => MachineInfo?.KernelVersion     ?? string.Empty;
 
+        /// <summary>Optional logo image path from the connection configuration.</summary>
+        public string? LogoPath => Connection?.LogoPath;
+
         public async Task ConnectAsync()
         {
             if (Connection == null) return;
@@ -142,9 +150,9 @@ namespace PowerTerminal.ViewModels
                     {
                         IsConnected = false;
                         StatusText  = ex != null ? $"Error: {ex.Message}" : "Disconnected";
-                        Header      = $"✕ {Connection.Name}";
                         if (ex != null)
                             WriteToTerminal($"\r\n\x1b[91mConnection lost: {ex.Message}\x1b[0m\r\n");
+                        TabCloseRequested?.Invoke();
                     });
                 };
 
