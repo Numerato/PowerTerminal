@@ -36,9 +36,10 @@
             <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
             <Border Grid.Row="0"
                     BorderBrush="#3b3b3c"
-                    BorderThickness="0,0,0,1">
-            <Grid
-                  Background="{StaticResource TitleBarBrush}">
+                    BorderThickness="0,0,0,1"
+                    CornerRadius="7,7,0,0"
+                    Background="{StaticResource TitleBarBrush}">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>

@@ -20,9 +20,12 @@
             </Grid.RowDefinitions>
 
             <!-- Title bar -->
-            <Grid Grid.Row="0"
-                  Background="{StaticResource TitleBarBrush}"
-                  MouseLeftButtonDown="TitleBar_MouseDown">
+            <Border Grid.Row="0"
+                    Background="{StaticResource TitleBarBrush}"
+                    BorderBrush="#3b3b3c"
+                    BorderThickness="0,0,0,1"
+                    CornerRadius="7,7,0,0">
+            <Grid MouseLeftButtonDown="TitleBar_MouseDown">
                 <TextBlock x:Name="TitleText"
                            Text="Confirm"
                            FontWeight="SemiBold"
@@ -38,6 +41,7 @@
                                FontSize="10"/>
                 </Button>
             </Grid>
+            </Border>
 
             <!-- Content -->
             <StackPanel Grid.Row="1" Margin="20,16,20,20">
