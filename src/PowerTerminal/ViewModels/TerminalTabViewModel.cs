@@ -176,7 +176,7 @@ namespace PowerTerminal.ViewModels
             {
                 IsConnecting = false;
                 StatusText   = $"Failed: {ex.Message}";
-                Header       = $"✕ {Connection?.Name ?? "Terminal"}";
+                Header       = Connection?.Name ?? "Terminal";
                 WriteToTerminal($"\r\n\x1b[91mConnection failed: {ex.Message}\x1b[0m\r\n");
             }
         }

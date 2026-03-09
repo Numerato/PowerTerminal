@@ -70,9 +70,11 @@ namespace PowerTerminal.Services
                         connection.Username,
                         new PrivateKeyFile(keyFile)));
                 }
-                else if (PasswordPrompt != null)
+
+                // Always add keyboard-interactive as a fallback so the server can prompt
+                // for a password when no key is available or when key auth is rejected.
+                if (PasswordPrompt != null)
                 {
-                    // No private key: use keyboard-interactive so the server can prompt for a password.
                     var kia = new KeyboardInteractiveAuthenticationMethod(connection.Username);
                     kia.AuthenticationPrompt += (_, e) =>
                     {
@@ -81,7 +83,8 @@ namespace PowerTerminal.Services
                     };
                     authMethods.Add(kia);
                 }
-                else
+
+                if (authMethods.Count == 0)
                 {
                     throw new InvalidOperationException(
                         "No authentication method available: configure SSH keys in the global keys folder " +
