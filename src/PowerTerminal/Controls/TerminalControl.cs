@@ -525,6 +525,26 @@ namespace PowerTerminal.Controls
                 // Mode settings
                 case 'h': case 'l':
                     break;
+                // Device Attributes — respond so programs like 'less' and apt's progress
+                // display don't hang waiting for terminal capability confirmation.
+                case 'c':
+                    {
+                        bool secondary = paramStr.StartsWith(">");
+                        // Strip the leading '>' for secondary DA; guard against bare ">".
+                        string p = secondary && paramStr.Length > 1 ? paramStr.Substring(1) : (secondary ? "" : paramStr);
+                        if (!secondary && (p == "" || p == "0"))
+                            UserInput?.Invoke("\x1b[?1;2c");      // Primary DA: VT100 with Advanced Video Option
+                        else if (secondary && (p == "" || p == "0"))
+                            UserInput?.Invoke("\x1b[>0;10;1c");   // Secondary DA: VT220-class terminal
+                    }
+                    break;
+                // Device Status Report
+                case 'n':
+                    if (paramStr == "5")
+                        UserInput?.Invoke("\x1b[0n");    // device OK
+                    else if (paramStr == "6")
+                        UserInput?.Invoke("\x1b[1;1R");  // cursor position (row 1, col 1)
+                    break;
             }
         }
 

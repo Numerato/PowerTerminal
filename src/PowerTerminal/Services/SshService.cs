@@ -153,7 +153,7 @@ namespace PowerTerminal.Services
                 }
 
                 _shellStream = (_client ?? throw new InvalidOperationException("SSH client was not initialized."))
-                    .CreateShellStream("xterm-256color", 220, 50, 1760, 400, 4096);
+                    .CreateShellStream("xterm-256color", 220, 50, 1760, 400, 65536);
             });
 
             _log.LogTerminalEvent(_sessionName, "Connected");
@@ -261,29 +261,36 @@ namespace PowerTerminal.Services
             var token = _readCts.Token;
             Task.Run(() =>
             {
-                var buffer = new byte[4096];
-                while (!token.IsCancellationRequested && IsConnected && _shellStream != null)
+                // Use a large read buffer so a burst of output (e.g. 'apt list') never
+                // stalls in SSH.NET's internal pipe and exhausts the SSH channel window.
+                var buffer = new byte[65536];
+
+                // Capture a local reference; Disconnect() nulls _shellStream concurrently.
+                var stream = _shellStream;
+                while (!token.IsCancellationRequested && stream != null)
                 {
                     try
                     {
-                        if (_shellStream.DataAvailable)
+                        // Blocking read — returns as soon as any bytes arrive, with no
+                        // polling sleep.  This keeps the SSH channel window extended and
+                        // prevents server-side processes from blocking on a full write buffer.
+                        int read = stream.Read(buffer, 0, buffer.Length);
+                        if (read > 0)
                         {
-                            int read = _shellStream.Read(buffer, 0, buffer.Length);
-                            if (read > 0)
-                            {
-                                string data = Encoding.UTF8.GetString(buffer, 0, read);
-                                _log.LogTerminalOutput(_sessionName, data.Replace("\r\n", "\\n").Replace("\n", "\\n"));
-                                DataReceived?.Invoke(data);
-                            }
+                            string data = Encoding.UTF8.GetString(buffer, 0, read);
+                            _log.LogTerminalOutput(_sessionName, data.Replace("\r\n", "\\n").Replace("\n", "\\n"));
+                            DataReceived?.Invoke(data);
                         }
                         else
                         {
-                            Thread.Sleep(10);
+                            // 0-byte read means the stream was closed cleanly.
+                            break;
                         }
                     }
-                    catch (Exception ex) when (!token.IsCancellationRequested)
+                    catch (Exception ex)
                     {
-                        Disconnected?.Invoke(ex);
+                        if (!token.IsCancellationRequested)
+                            Disconnected?.Invoke(ex);
                         break;
                     }
                 }
