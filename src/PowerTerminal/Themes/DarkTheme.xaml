@@ -53,6 +53,10 @@
     <SolidColorBrush x:Key="ErrorBrush"            Color="{StaticResource ErrorColor}"/>
     <SolidColorBrush x:Key="SelectionBrush"        Color="{StaticResource SelectionColor}"/>
     <SolidColorBrush x:Key="TransparentBrush"      Color="Transparent"/>
+    <SolidColorBrush x:Key="TabInactiveBrush"      Color="{StaticResource TabInactiveColor}"/>
+    <SolidColorBrush x:Key="MenuBackgroundBrush"   Color="{StaticResource SurfaceHighColor}"/>
+    <SolidColorBrush x:Key="MenuBorderBrush"       Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="MenuForegroundBrush"   Color="{StaticResource ForegroundColor}"/>
 
     <!-- Base TextBlock style -->
     <Style TargetType="TextBlock">
@@ -682,6 +686,64 @@
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter/>
                     </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Context Menu Style -->
+    <Style TargetType="{x:Type ContextMenu}">
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Grid.IsSharedSizeScope" Value="true"/>
+        <Setter Property="HasDropShadow" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ContextMenu}">
+                    <Border x:Name="Border" Background="{StaticResource MenuBackgroundBrush}" BorderThickness="1" BorderBrush="{StaticResource MenuBorderBrush}">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="HasDropShadow" Value="true">
+                            <Setter TargetName="Border" Property="Padding" Value="0,3,0,3"/>
+                            <Setter TargetName="Border" Property="CornerRadius" Value="4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- MenuItem Style -->
+    <Style TargetType="{x:Type MenuItem}">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Foreground" Value="{StaticResource MenuForegroundBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type MenuItem}">
+                    <Border x:Name="Border" Padding="5,2,5,2" BorderThickness="1" Background="Transparent">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Icon"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="Shortcut"/>
+                                <ColumnDefinition Width="13"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter x:Name="Icon" Margin="6,0,6,0" VerticalAlignment="Center" ContentSource="Icon"/>
+                            <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            <ContentPresenter x:Name="InputGestureText" Grid.Column="2" ContentSource="InputGestureText" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="true">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="false">
+                            <Setter Property="Foreground" Value="{StaticResource ForegroundDimBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

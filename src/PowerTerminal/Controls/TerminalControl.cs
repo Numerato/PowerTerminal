@@ -1,11 +1,19 @@
-using System;
+#nullable enable
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Rendering;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Highlighting.Xshd;
+using System.Text.RegularExpressions;
 
 namespace PowerTerminal.Controls
 {
@@ -13,18 +21,18 @@ namespace PowerTerminal.Controls
     /// A simple VT100/ANSI terminal emulator control rendered in a WPF RichTextBox.
     /// Supports color attributes, basic cursor movement, and screen scrollback.
     /// </summary>
-    public class TerminalControl : RichTextBox
+    public class TerminalControl : TextEditor
     {
         // ── Dependency Properties ─────────────────────────────────────────────
         public static readonly DependencyProperty TerminalFontFamilyProperty =
             DependencyProperty.Register(nameof(TerminalFontFamily), typeof(FontFamily),
                 typeof(TerminalControl), new PropertyMetadata(new FontFamily("Cascadia Code, Consolas, Courier New"),
-                    (d, e) => ((TerminalControl)d).UpdateFont()));
+                    (d, _) => ((TerminalControl)d).FontFamily = (FontFamily)d.GetValue(TerminalFontFamilyProperty)));
 
         public static readonly DependencyProperty TerminalFontSizeProperty =
             DependencyProperty.Register(nameof(TerminalFontSize), typeof(double),
                 typeof(TerminalControl), new PropertyMetadata(13.0,
-                    (d, e) => ((TerminalControl)d).UpdateFont()));
+                    (d, _) => ((TerminalControl)d).FontSize = (double)d.GetValue(TerminalFontSizeProperty)));
 
         public FontFamily TerminalFontFamily
         {
@@ -38,141 +46,266 @@ namespace PowerTerminal.Controls
             set => SetValue(TerminalFontSizeProperty, value);
         }
 
-        // ── VT100 Color palette ───────────────────────────────────────────────
-        private static readonly Color[] AnsiColors =
-        {
-            Colors.Black,           // 0 - Black
-            Color.FromRgb(197,15,31), // 1 - Red
-            Color.FromRgb(19,161,14), // 2 - Green
-            Color.FromRgb(193,156,0), // 3 - Yellow
-            Color.FromRgb(0,55,218),  // 4 - Blue
-            Color.FromRgb(136,23,152),// 5 - Magenta
-            Color.FromRgb(58,150,221),// 6 - Cyan
-            Color.FromRgb(204,204,204),// 7 - White
-            Color.FromRgb(118,118,118),// 8 - Bright Black (Gray)
-            Color.FromRgb(231,72,86), // 9 - Bright Red
-            Color.FromRgb(22,198,12), // 10 - Bright Green
-            Color.FromRgb(249,241,165),// 11 - Bright Yellow
-            Color.FromRgb(59,120,255),// 12 - Bright Blue
-            Color.FromRgb(180,0,158), // 13 - Bright Magenta
-            Color.FromRgb(97,214,214),// 14 - Bright Cyan
-            Color.FromRgb(242,242,242),// 15 - Bright White
-        };
-
-        // Current text attributes
-        private Brush _fg = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-        private Brush _bg = Brushes.Transparent;
-        private bool _bold;
-        private bool _underline;
-
-        private Paragraph _currentParagraph = new();
-        private readonly StringBuilder _escBuffer = new();
-        private bool _inEscape;
-        private bool _inOsc;
-        private readonly StringBuilder _oscBuffer = new();
-
-        // ── Hidden-input mode (for inline password collection) ─────────────────
-        private Action<string>? _hiddenInputCallback;
-        private readonly StringBuilder _hiddenInputBuffer = new();
-
-        // ── Blinking cursor ───────────────────────────────────────────────────
-        private readonly Run _cursorRun;
-        private readonly System.Windows.Threading.DispatcherTimer _cursorTimer;
-        private bool _cursorVisible = true;
-        private bool _pendingCR;
-        private bool _oscPendingEsc;   // true after \x1b inside OSC, waiting for \ (ST)
-        private const int CursorBlinkIntervalMs = 530;
-
-        private const int MaxParagraphs = 5000;
+        private readonly TextSegmentCollection<ColorSegment> _segments;
+        private readonly AnsiColorizer _colorizer;
+        private TerminalStyle _currentStyle = new();
 
         public event Action<string>? UserInput;
 
+        // Queue for background appending to avoid UI freeze
+        private readonly ConcurrentQueue<string> _incomingDataQueue = new();
+        private string _leftoverStr = "";
+        private int _isRendering;
+
+        private static readonly SolidColorBrush TerminalForeground = new SolidColorBrush(Color.FromRgb(204, 204, 204));
+        private static readonly SolidColorBrush TerminalBackground = new SolidColorBrush(Color.FromRgb(12, 12, 12));
+        private static readonly SolidColorBrush TerminalCaret      = new SolidColorBrush(Color.FromRgb(204, 204, 204));
+        private static readonly SolidColorBrush TerminalSelection  = new SolidColorBrush(Color.FromArgb(120, 92, 40, 0));
+
+        static TerminalControl()
+        {
+            TerminalForeground.Freeze();
+            TerminalBackground.Freeze();
+            TerminalCaret.Freeze();
+            TerminalSelection.Freeze();
+            foreach (var b in AnsiColors) b.Freeze();
+        }
+
         public TerminalControl()
         {
-            IsReadOnly    = true;
-            IsDocumentEnabled = true;
-            Background    = new SolidColorBrush(Color.FromRgb(12, 12, 12));
-            Foreground    = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-            FontFamily    = new FontFamily("Cascadia Code, Consolas, Courier New");
-            FontSize      = 16;
-            BorderThickness = new Thickness(0);
-            Padding       = new Thickness(4);
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            IsReadOnly = true;
+            ShowLineNumbers = false;
+            FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New");
+            FontSize = 13;
+            Background = TerminalBackground;
+            Foreground = TerminalForeground;
 
-            Document.LineHeight = 16;
-            Document.Blocks.Clear();
-            _currentParagraph.Margin = new Thickness(0);
+            // Critical for performance with large outputs
+            Options.EnableTextDragDrop = false;
+            Options.EnableRectangularSelection = false;
+            Options.EnableHyperlinks = false;
+            Options.AllowScrollBelowDocument = false;
 
-            // Blinking block cursor — always kept as the last inline of _currentParagraph
-            _cursorRun = new Run("|")
-            {
-                Foreground = new SolidColorBrush(Color.FromRgb(204, 204, 204)),
-                FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New"),
-                FontSize   = 16
-            };
-            _currentParagraph.Inlines.Add(_cursorRun);
-            Document.Blocks.Add(_currentParagraph);
+            _segments = new TextSegmentCollection<ColorSegment>(this.Document);
+            _colorizer = new AnsiColorizer(_segments);
+            TextArea.TextView.LineTransformers.Add(_colorizer);
 
-            // Toggle cursor visibility every CursorBlinkIntervalMs
-            _cursorTimer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(CursorBlinkIntervalMs)
-            };
-            _cursorTimer.Tick += OnCursorTick;
-            _cursorTimer.Start();
+            // Apply colors to the TextArea immediately (template may already be applied)
+            ApplyTerminalColors();
 
-            Unloaded += OnControlUnloaded;
-            Loaded   += OnControlLoaded;
-
-            PreviewKeyDown   += OnPreviewKeyDown;
+            PreviewKeyDown += OnPreviewKeyDown;
             PreviewTextInput += OnPreviewTextInput;
 
+            Loaded += (_, _) => ApplyTerminalColors();
+
+            // Default focus
             Focusable = true;
+
+            // Context Menu
+            ContextMenu = new ContextMenu();
+            var copy = new MenuItem { Header = "Copy" };
+            copy.Click += (s, e) => Copy();
+            ContextMenu.Items.Add(copy);
+
+            var paste = new MenuItem { Header = "Paste" };
+            paste.Click += (s, e) => Paste();
+            ContextMenu.Items.Add(paste);
+
+            ContextMenu.Opened += (s, e) =>
+            {
+                copy.IsEnabled = !TextArea.Selection.IsEmpty;
+                paste.IsEnabled = Clipboard.ContainsText();
+            };
         }
 
-        private void OnCursorTick(object? sender, EventArgs e)
+        public override void OnApplyTemplate()
         {
-            _cursorVisible = !_cursorVisible;
-            _cursorRun.Text = _cursorVisible ? "▋" : "";
+            base.OnApplyTemplate();
+            // Re-apply after the control template is fully instantiated, so
+            // TextArea.Foreground / caret / selection are definitely set.
+            ApplyTerminalColors();
         }
 
-        private void OnControlUnloaded(object sender, RoutedEventArgs e) => _cursorTimer.Stop();
-        private void OnControlLoaded(object sender, RoutedEventArgs e)   => _cursorTimer.Start();
-
-        private void UpdateFont()
+        private void ApplyTerminalColors()
         {
-            FontFamily = TerminalFontFamily;
-            FontSize   = TerminalFontSize;
+            // AvalonEdit renders text through TextArea → TextView, not through
+            // the outer TextEditor's Foreground property.  We must set the colors
+            // explicitly on the TextArea so the DrawingContext picks them up.
+            TextArea.Foreground        = TerminalForeground;
+            TextArea.Background        = TerminalBackground;
+            TextArea.TextView.NonPrintableCharacterBrush = TerminalForeground;
+
+            // Caret
+            TextArea.Caret.CaretBrush = TerminalCaret;
+
+            // Selection highlight
+            TextArea.SelectionBrush  = TerminalSelection;
+            TextArea.SelectionForeground = TerminalForeground;
         }
 
-        // ── Input handling ────────────────────────────────────────────────────
+        // ── Public API ────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Prints <paramref name="prompt"/> in the terminal and switches to hidden-input mode.
-        /// Every keystroke is accumulated without display until Enter is pressed, at which point
-        /// <paramref name="callback"/> is invoked with the collected text and normal mode resumes.
-        /// Escape and Ctrl+C cancel the collection and invoke <paramref name="callback"/> with
-        /// an empty string.  Must be called on the UI thread.
-        /// </summary>
-        public void CollectHiddenInput(string prompt, Action<string> callback)
+        public void ClearScreen()
         {
-            _hiddenInputBuffer.Clear();
-            _hiddenInputCallback = callback;
-            AppendAnsiData(prompt);
+            Document.Text = "";
+            _segments.Clear();
+            _currentStyle = new TerminalStyle();
+            _leftoverStr = "";
         }
 
-        /// <summary>
-        /// Cancels any in-progress hidden-input collection, invoking the pending callback
-        /// with an empty string so that the waiting SSH background thread is unblocked.
-        /// Safe to call from the UI thread at any time.
-        /// </summary>
-        public void CancelHiddenInput()
+        private const int MaxCharsPerFrame = 10000; // Limit processing to prevent freeze
+
+        public void AppendAnsiData(string data)
         {
-            var cb = _hiddenInputCallback;
-            _hiddenInputCallback = null;
-            _hiddenInputBuffer.Clear();
-            cb?.Invoke(string.Empty);
+            if (string.IsNullOrEmpty(data)) return;
+            _incomingDataQueue.Enqueue(data);
+
+            if (Interlocked.CompareExchange(ref _isRendering, 1, 0) == 0)
+            {
+
+                Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Normal);
+            }
         }
+
+        private void ProcessQueue()
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                int charsProcessed = 0;
+
+                while ((charsProcessed < MaxCharsPerFrame || _leftoverStr.Length > 0) && _incomingDataQueue.TryDequeue(out var s))
+                {
+                    if (_leftoverStr.Length > 0)
+                    {
+                        s = _leftoverStr + s;
+                        _leftoverStr = "";
+                    }
+
+                    // Simple cleaning for now
+                    s = s.Replace("\r\n", "\n").Replace("\r", "\n");
+
+                    // 1. Strip Bracketed Paste Mode (\e[?2004h / \e[?2004l)
+                    s = Regex.Replace(s, @"\x1b\[\?2004[hl]", "");
+
+                    // 2. Strip Window Title OSC (\e]0;...\a)
+                    s = Regex.Replace(s, @"\x1b\][0-9;]*.*?\x07", "");
+
+                    // Check for Clear Screen sequences before stripping them
+                    if (s.Contains("\x1b[2J") || s.Contains("\x1b[3J") || s.Contains("\x1b[H\x1b[2J"))
+                    {
+                        ClearScreen();
+                        sb.Clear();
+                    }
+
+                    // 3. Strip standard CSI SGR (Color), EL/ED (Erase), and Cursor Move (H)
+                    // Added H and J to the character class to catch [H, [2J, [3J
+                    s = Regex.Replace(s, @"\x1b\[[0-9;]*[mKHJ]", "");
+
+                    sb.Append(s);
+                    charsProcessed += s.Length;
+                }
+
+                if (sb.Length > 0)
+                {
+                    Document.BeginUpdate();
+                    try
+                    {
+                        Document.Insert(Document.TextLength, sb.ToString());
+                    }
+                    finally
+                    {
+                        Document.EndUpdate();
+                    }
+                    ScrollToEnd();
+                }
+            }
+            catch (Exception ex)
+            {
+                try { Document.Insert(Document.TextLength, $"\r\n[Error: {ex.Message}]\r\n"); } catch { }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isRendering, 0);
+
+                if (!_incomingDataQueue.IsEmpty)
+                {
+                    if (Interlocked.CompareExchange(ref _isRendering, 1, 0) == 0)
+                    {
+                        Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Normal);
+                    }
+                }
+            }
+        }
+
+        private void AddTextSegment(string text, StringBuilder sb, List<ColorSegment> segments, int baseOffset, ref int relativeOffset)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            // Normalise line endings: \r\n → \n, lone \r → \n.
+            // AvalonEdit expects \n (or \r\n) but lone \r causes the cursor to
+            // overwrite the start of the current line, making output appear blank.
+            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+
+            if (_currentStyle.IsNonDefault && text.Length > 0)
+            {
+                segments.Add(new ColorSegment
+                {
+                    StartOffset = baseOffset + relativeOffset,
+                    Length = text.Length,
+                    Foreground = _currentStyle.Foreground,
+                    Background = _currentStyle.Background,
+                    IsBold = _currentStyle.IsBold
+                });
+            }
+            sb.Append(text);
+            relativeOffset += text.Length;
+        }
+
+        private void ProcessSgr(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                _currentStyle.Reset();
+                return;
+            }
+
+            var codes = content.Split(';');
+            foreach (var code in codes)
+            {
+                if (int.TryParse(code, out int c))
+                {
+                    switch (c)
+                    {
+                        case 0: _currentStyle.Reset(); break;
+                        case 1: _currentStyle.IsBold = true; break;
+                        case 22: _currentStyle.IsBold = false; break;
+                        case 39: _currentStyle.Foreground = null; break; // Default FG
+                        case 49: _currentStyle.Background = null; break; // Default BG
+
+                        // Foreground 30-37
+                        case >= 30 and <= 37:
+                            _currentStyle.Foreground = AnsiColors[c - 30 + (_currentStyle.IsBold ? 8 : 0)];
+                            break;
+                        // Foreground 90-97
+                        case >= 90 and <= 97:
+                            _currentStyle.Foreground = AnsiColors[c - 90 + 8];
+                            break;
+
+                        // Background 40-47
+                        case >= 40 and <= 47:
+                            _currentStyle.Background = AnsiColors[c - 40];
+                            break;
+                        // Background 100-107
+                        case >= 100 and <= 107:
+                            _currentStyle.Background = AnsiColors[c - 100 + 8];
+                            break;
+                    }
+                }
+            }
+        }
+
+        // ── Input Handling ──────────────────────────────────────────────────
 
         private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
         {
@@ -195,6 +328,15 @@ namespace PowerTerminal.Controls
             {
                 bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
                 bool alt  = (e.KeyboardDevice.Modifiers & ModifierKeys.Alt)     != 0;
+
+                // Allow Paste during hidden input
+                if (ctrl && e.Key == Key.V)
+                {
+                    Paste();
+                    e.Handled = true;
+                    return;
+                }
+
                 switch (e.Key)
                 {
                     case Key.Enter:
@@ -230,20 +372,40 @@ namespace PowerTerminal.Controls
                         }
                         else if (ctrl || alt)
                         {
-                            // Suppress other modifier combinations (Ctrl+Z, Alt+F4, etc.)
-                            // so they don't accidentally trigger RichTextBox commands while
-                            // the user is typing a password.
                             e.Handled = true;
                         }
-                        // Plain printable key: do NOT set e.Handled here.
-                        // WPF will generate a WM_CHAR message which fires PreviewTextInput,
-                        // and OnPreviewTextInput will buffer the character.  Setting
-                        // e.Handled = true here would suppress WM_CHAR and break buffering.
                         break;
                 }
                 return;
             }
 
+            // Copy/Paste Handling
+            if (e.Key == Key.C || e.Key == Key.V || e.Key == Key.Insert)
+            {
+                bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+                bool shift = (e.KeyboardDevice.Modifiers & ModifierKeys.Shift) != 0;
+
+                // Copy: Ctrl+C or Ctrl+Insert (only if selection exists)
+                if ((ctrl && e.Key == Key.C) || (ctrl && e.Key == Key.Insert))
+                {
+                    if (!TextArea.Selection.IsEmpty)
+                    {
+                        ApplicationCommands.Copy.Execute(null, this);
+                        e.Handled = true;
+                        return;
+                    }
+                }
+
+                // Paste: Ctrl+V or Shift+Insert
+                if ((ctrl && e.Key == Key.V) || (shift && e.Key == Key.Insert))
+                {
+                    Paste();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            // (Same key mapping logic as before)
             string? seq = KeyToSequence(e);
             if (seq != null)
             {
@@ -252,9 +414,132 @@ namespace PowerTerminal.Controls
             }
         }
 
+        private Action<string>? _hiddenInputCallback;
+        private readonly StringBuilder _hiddenInputBuffer = new();
+
+        public new void Paste()
+        {
+            if (Clipboard.ContainsText())
+            {
+                var text = Clipboard.GetText();
+                if (_hiddenInputCallback != null)
+                {
+                    _hiddenInputBuffer.Append(text);
+                }
+                else
+                {
+                    UserInput?.Invoke(text);
+                }
+            }
+        }
+
+        public void CollectHiddenInput(string prompt, Action<string> callback)
+        {
+            _hiddenInputBuffer.Clear();
+            _hiddenInputCallback = callback;
+            AppendAnsiData(prompt);
+        }
+
+        public void CancelHiddenInput()
+        {
+            var cb = _hiddenInputCallback;
+            _hiddenInputCallback = null;
+            cb?.Invoke(string.Empty);
+        }
+
+        // ── ANSI Data Structures ─────────────────────────────────────────────
+
+        private class TerminalStyle
+        {
+            public Brush? Foreground;
+            public Brush? Background;
+            public bool IsBold;
+
+            public bool IsNonDefault => Foreground != null || Background != null || IsBold;
+
+            public void Reset()
+            {
+                Foreground = null;
+                Background = null;
+                IsBold = false;
+            }
+        }
+
+        private class ColorSegment : TextSegment
+        {
+            public Brush? Foreground;
+            public Brush? Background;
+            public bool IsBold;
+        }
+
+        private class AnsiColorizer : DocumentColorizingTransformer
+        {
+            private readonly TextSegmentCollection<ColorSegment> _segments;
+
+            public AnsiColorizer(TextSegmentCollection<ColorSegment> segments)
+            {
+                _segments = segments;
+            }
+
+            public void Clear()
+            {
+                // Segments must be cleared from the collection
+            }
+
+            protected override void ColorizeLine(DocumentLine line)
+            {
+                var overlaps = _segments.FindOverlappingSegments(line);
+                foreach (var seg in overlaps)
+                {
+                    int start = Math.Max(seg.StartOffset, line.Offset);
+                    int end = Math.Min(seg.EndOffset, line.EndOffset);
+
+                    if (end > start)
+                    {
+                        ChangeLinePart(start, end, element =>
+                        {
+                            if (seg.Foreground != null) element.TextRunProperties.SetForegroundBrush(seg.Foreground);
+                            if (seg.Background != null) element.TextRunProperties.SetBackgroundBrush(seg.Background);
+                            if (seg.IsBold)
+                            {
+                                var tf = element.TextRunProperties.Typeface;
+                                element.TextRunProperties.SetTypeface(new Typeface(
+                                    tf.FontFamily, tf.Style, FontWeights.Bold, tf.Stretch));
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── Standard ANSI Colors ──────────────────────────────────────────────
+        private static readonly Brush[] AnsiColors =
+        {
+            new SolidColorBrush(Color.FromRgb(30, 30, 30)), // 0 Black (adjusted for visibility on dark bg)
+            new SolidColorBrush(Color.FromRgb(197,15,31)), // 1 Red
+            new SolidColorBrush(Color.FromRgb(19,161,14)), // 2 Green
+            new SolidColorBrush(Color.FromRgb(193,156,0)), // 3 Yellow
+            // User requested blue links to be "removed" (changed to default text color)
+            // Was: new SolidColorBrush(Color.FromRgb(59, 142, 234))
+            new SolidColorBrush(Color.FromRgb(204, 204, 204)), // 4 Blue -> Default White/Gray
+            new SolidColorBrush(Color.FromRgb(136,23,152)),// 5 Magenta
+            new SolidColorBrush(Color.FromRgb(58,150,221)),// 6 Cyan
+            new SolidColorBrush(Color.FromRgb(204,204,204)),// 7 White
+            new SolidColorBrush(Color.FromRgb(118,118,118)),// 8 Bright Black
+            new SolidColorBrush(Color.FromRgb(231,72,86)), // 9 Bright Red
+            new SolidColorBrush(Color.FromRgb(22,198,12)), // 10 Bright Green
+            new SolidColorBrush(Color.FromRgb(249,241,165)),// 11 Bright Yellow
+            // Was: new SolidColorBrush(Color.FromRgb(59,120,255))
+            new SolidColorBrush(Color.FromRgb(204, 204, 204)), // 12 Bright Blue -> Default White/Gray
+            new SolidColorBrush(Color.FromRgb(180,0,158)), // 13 Bright Magenta
+            new SolidColorBrush(Color.FromRgb(97,214,214)),// 14 Bright Cyan
+            new SolidColorBrush(Color.FromRgb(242,242,242)),// 15 Bright White
+        };
+
+
         private static string? KeyToSequence(KeyEventArgs e)
         {
-            bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+             bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
             switch (e.Key)
             {
                 case Key.Enter:     return "\r";
@@ -290,409 +575,6 @@ namespace PowerTerminal.Controls
                     return null;
             }
         }
-
-        // ── VT100 parser ──────────────────────────────────────────────────────
-
-        public void AppendAnsiData(string data)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                foreach (char ch in data)
-                    ParseChar(ch);
-                ScrollToEnd();
-                TrimHistory();
-            });
-        }
-
-        public void ClearScreen()
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _pendingCR = false;
-                _oscPendingEsc = false;
-                Document.Blocks.Clear();
-                _currentParagraph = new Paragraph { Margin = new Thickness(0) };
-                _currentParagraph.Inlines.Add(_cursorRun);
-                Document.Blocks.Add(_currentParagraph);
-            });
-        }
-
-        private void ParseChar(char ch)
-        {
-            // ── OSC (Operating System Command) ─────────────────────────────────────
-            if (_inOsc)
-            {
-                if (_oscPendingEsc)
-                {
-                    _oscPendingEsc = false;
-                    // ESC \ (String Terminator) ends the OSC; any other char is just discarded.
-                    if (ch == '\\')
-                    {
-                        _inOsc = false;
-                        _oscBuffer.Clear();
-                    }
-                    return;
-                }
-                switch (ch)
-                {
-                    case '\x07': // BEL — ST shorthand
-                    case '\x9c': // 8-bit ST
-                        _inOsc = false;
-                        _oscBuffer.Clear();
-                        break;
-                    case '\x1b': // possible start of ESC \ (ST)
-                        _oscPendingEsc = true;
-                        break;
-                    default:
-                        _oscBuffer.Append(ch);
-                        break;
-                }
-                return;
-            }
-
-            // ── Escape / CSI sequences ─────────────────────────────────────────────
-            if (_inEscape)
-            {
-                // The very first char after ESC determines the sequence type.
-                if (_escBuffer.Length == 0)
-                {
-                    if (ch == ']')
-                    {
-                        // ESC ] = OSC introducer — switch to OSC mode immediately so that
-                        // the OSC content (e.g. window title) is never printed as plain text.
-                        _inEscape = false;
-                        _inOsc = true;
-                        _oscPendingEsc = false;
-                        _oscBuffer.Clear();
-                        return;
-                    }
-
-                    _escBuffer.Append(ch);
-
-                    // Non-CSI, non-charset-designator: single char after ESC completes the sequence
-                    // (e.g. \x1b= application keypad, \x1b> normal keypad, \x1bM reverse index …).
-                    if (ch != '[' && ch != '(' && ch != ')' && ch != '*' && ch != '+')
-                    {
-                        ProcessEscape(_escBuffer.ToString());
-                        _escBuffer.Clear();
-                        _inEscape = false;
-                    }
-                    return;
-                }
-
-                // Continuation of a multi-character sequence.
-                _escBuffer.Append(ch);
-                bool terminate;
-                if (_escBuffer[0] == '[')
-                {
-                    // CSI — final byte is in the range 0x40–0x7E (@..~)
-                    terminate = IsEscapeTerminator(ch);
-                }
-                else
-                {
-                    // Charset designators (ESC ( X, ESC ) X, …) — two chars after ESC
-                    terminate = _escBuffer.Length >= 2;
-                }
-
-                if (terminate)
-                {
-                    ProcessEscape(_escBuffer.ToString());
-                    _escBuffer.Clear();
-                    _inEscape = false;
-                }
-                return;
-            }
-
-            // Lone CR (not followed by LF): move cursor to column 0 — overwrite the current line.
-            // CR+LF pair: treat as a normal newline; the CR just resets the pending flag.
-            if (_pendingCR && ch != '\n')
-            {
-                _pendingCR = false;
-                ClearCurrentLine();
-            }
-
-            switch (ch)
-            {
-                case '\x1b':
-                    _inEscape = true;
-                    _escBuffer.Clear();
-                    break;
-                case '\x9b':                  // CSI shortcut
-                    _inEscape = true;
-                    _escBuffer.Append('[');
-                    break;
-                case '\x9d':                  // OSC shortcut
-                    _inOsc = true;
-                    _oscPendingEsc = false;
-                    _oscBuffer.Clear();
-                    break;
-                case '\r':
-                    _pendingCR = true;
-                    break;
-                case '\n':
-                    _pendingCR = false;
-                    // Move cursor to the new paragraph
-                    _currentParagraph.Inlines.Remove(_cursorRun);
-                    _currentParagraph = new Paragraph { Margin = new Thickness(0) };
-                    _currentParagraph.Inlines.Add(_cursorRun);
-                    Document.Blocks.Add(_currentParagraph);
-                    break;
-                case '\x07':                  // Bell – ignore
-                    break;
-                case '\b':                    // Backspace
-                    RemoveLastChar();
-                    break;
-                default:
-                    if (ch >= ' ')
-                        AppendChar(ch);
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Clears all content from the current line (keeping the cursor run), simulating
-        /// the VT100 "erase to end of line" / carriage-return-overwrite behaviour.
-        /// Must be called on the UI thread.
-        /// </summary>
-        private void ClearCurrentLine()
-        {
-            _currentParagraph.Inlines.Remove(_cursorRun);
-            _currentParagraph.Inlines.Clear();
-            _currentParagraph.Inlines.Add(_cursorRun);
-        }
-
-        private static bool IsEscapeTerminator(char ch)
-        {
-            // CSI final byte: 0x40 ('@') through 0x7E ('~') per VT100 spec.
-            // Parameter bytes (0x30-0x3F: digits, ';', ':', '<', '=', '>', '?') and
-            // intermediate bytes (0x20-0x2F) are all below 0x40 and never trigger this.
-            return ch >= '@' && ch <= '~';
-        }
-
-        private void ProcessEscape(string seq)
-        {
-            if (seq.StartsWith("["))
-            {
-                ProcessCsi(seq.Substring(1));
-            }
-            else if (seq.StartsWith("]"))
-            {
-                // OSC - set title, ignore
-            }
-            else if (seq == "c")
-            {
-                ResetAttributes();
-                ClearScreen();
-            }
-        }
-
-        private void ProcessCsi(string seq)
-        {
-            if (seq.Length == 0) return;
-            char cmd = seq[^1];
-            string paramStr = seq.Length > 1 ? seq.Substring(0, seq.Length - 1) : string.Empty;
-
-            switch (cmd)
-            {
-                case 'm': // SGR - Set Graphic Rendition
-                    ProcessSgr(paramStr);
-                    break;
-                case 'J': // Erase in display
-                    if (paramStr == "2" || paramStr == "") ClearScreen();
-                    break;
-                case 'H': // Cursor Position
-                case 'f':
-                    // For now, start a new line when repositioning to top
-                    if (paramStr == "" || paramStr == "1;1" || paramStr == "0;0")
-                        ClearScreen();
-                    break;
-                case 'K': // Erase in line
-                    // 0 (or omitted) = erase cursor to end; 1 = erase start to cursor; 2 = erase whole line.
-                    // Our cursor is always at end of line in the append model, so 0 and 2 both clear the line.
-                    {
-                        int kParam = 0;
-                        if (paramStr != "" && int.TryParse(paramStr, out int kp)) kParam = kp;
-                        if (kParam == 0 || kParam == 2)
-                            ClearCurrentLine();
-                    }
-                    break;
-                // Cursor movement – we rely on the shell to re-draw
-                case 'A': case 'B': case 'C': case 'D':
-                case 'E': case 'F': case 'G': case 'd':
-                case 'S': case 'T': case 'L': case 'M':
-                case 'P': case 'X': case '@':
-                    break;
-                // Mode settings
-                case 'h': case 'l':
-                    break;
-                // Device Attributes — respond so programs like 'less' and apt's progress
-                // display don't hang waiting for terminal capability confirmation.
-                case 'c':
-                    {
-                        bool secondary = paramStr.StartsWith(">");
-                        // Strip the leading '>' for secondary DA; guard against bare ">".
-                        string p = secondary && paramStr.Length > 1 ? paramStr.Substring(1) : (secondary ? "" : paramStr);
-                        if (!secondary && (p == "" || p == "0"))
-                            UserInput?.Invoke("\x1b[?1;2c");      // Primary DA: VT100 with Advanced Video Option
-                        else if (secondary && (p == "" || p == "0"))
-                            UserInput?.Invoke("\x1b[>0;10;1c");   // Secondary DA: VT220-class terminal
-                    }
-                    break;
-                // Device Status Report
-                case 'n':
-                    if (paramStr == "5")
-                        UserInput?.Invoke("\x1b[0n");    // device OK
-                    else if (paramStr == "6")
-                        UserInput?.Invoke("\x1b[1;1R");  // cursor position (row 1, col 1)
-                    break;
-            }
-        }
-
-        private void ProcessSgr(string paramStr)
-        {
-            var parts = paramStr.Split(';');
-            int i = 0;
-            while (i < parts.Length)
-            {
-                if (!int.TryParse(parts[i], out int code))
-                {
-                    i++;
-                    continue;
-                }
-
-                switch (code)
-                {
-                    case 0:  ResetAttributes(); break;
-                    case 1:  _bold = true;      break;
-                    case 4:  _underline = true; break;
-                    case 22: _bold = false;     break;
-                    case 24: _underline = false; break;
-
-                    // Foreground colors 30-37
-                    case >= 30 and <= 37:
-                        _fg = new SolidColorBrush(AnsiColors[code - 30 + (_bold ? 8 : 0)]);
-                        break;
-                    case 39: // default fg
-                        _fg = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-                        break;
-                    // Background colors 40-47
-                    case >= 40 and <= 47:
-                        _bg = new SolidColorBrush(AnsiColors[code - 40]);
-                        break;
-                    case 49: // default bg
-                        _bg = Brushes.Transparent;
-                        break;
-                    // Bright foreground 90-97
-                    case >= 90 and <= 97:
-                        _fg = new SolidColorBrush(AnsiColors[code - 90 + 8]);
-                        break;
-                    // Bright background 100-107
-                    case >= 100 and <= 107:
-                        _bg = new SolidColorBrush(AnsiColors[code - 100 + 8]);
-                        break;
-                    // 256-color and RGB foreground
-                    case 38:
-                        if (i + 2 < parts.Length && parts[i + 1] == "5")
-                        {
-                            if (int.TryParse(parts[i + 2], out int idx256))
-                                _fg = new SolidColorBrush(Get256Color(idx256));
-                            i += 2;
-                        }
-                        else if (i + 4 < parts.Length && parts[i + 1] == "2")
-                        {
-                            if (byte.TryParse(parts[i + 2], out byte r) &&
-                                byte.TryParse(parts[i + 3], out byte g) &&
-                                byte.TryParse(parts[i + 4], out byte b))
-                                _fg = new SolidColorBrush(Color.FromRgb(r, g, b));
-                            i += 4;
-                        }
-                        break;
-                    // 256-color and RGB background
-                    case 48:
-                        if (i + 2 < parts.Length && parts[i + 1] == "5")
-                        {
-                            if (int.TryParse(parts[i + 2], out int idx256))
-                                _bg = new SolidColorBrush(Get256Color(idx256));
-                            i += 2;
-                        }
-                        else if (i + 4 < parts.Length && parts[i + 1] == "2")
-                        {
-                            if (byte.TryParse(parts[i + 2], out byte r) &&
-                                byte.TryParse(parts[i + 3], out byte g) &&
-                                byte.TryParse(parts[i + 4], out byte b))
-                                _bg = new SolidColorBrush(Color.FromRgb(r, g, b));
-                            i += 4;
-                        }
-                        break;
-                }
-                i++;
-            }
-        }
-
-        private void ResetAttributes()
-        {
-            _fg        = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-            _bg        = Brushes.Transparent;
-            _bold      = false;
-            _underline = false;
-        }
-
-        private void AppendChar(char ch)
-        {
-            // Keep cursor as the last inline — insert new content before it
-            _currentParagraph.Inlines.Remove(_cursorRun);
-            var run = new Run(ch.ToString())
-            {
-                Foreground  = _fg,
-                Background  = _bg,
-                FontWeight  = _bold ? FontWeights.Bold : FontWeights.Normal,
-                TextDecorations = _underline ? TextDecorations.Underline : null,
-                FontFamily  = FontFamily,
-                FontSize    = FontSize
-            };
-            _currentParagraph.Inlines.Add(run);
-            _currentParagraph.Inlines.Add(_cursorRun);
-        }
-
-        private void RemoveLastChar()
-        {
-            // Temporarily remove cursor to expose the last real character
-            bool hadCursor = _currentParagraph.Inlines.LastInline == _cursorRun;
-            if (hadCursor) _currentParagraph.Inlines.Remove(_cursorRun);
-
-            if (_currentParagraph.Inlines.LastInline is Run r && r.Text.Length > 0)
-                r.Text = r.Text.Substring(0, r.Text.Length - 1);
-
-            if (hadCursor) _currentParagraph.Inlines.Add(_cursorRun);
-        }
-
-        private void TrimHistory()
-        {
-            while (Document.Blocks.Count > MaxParagraphs)
-            {
-                var first = Document.Blocks.FirstBlock;
-                // Always keep at least one paragraph (the current one that holds the cursor)
-                if (Document.Blocks.Count <= 1) break;
-                Document.Blocks.Remove(first);
-            }
-        }
-
-        private static Color Get256Color(int idx)
-        {
-            if (idx < 16)
-                return AnsiColors[idx];
-            if (idx < 232)
-            {
-                idx -= 16;
-                int r = (idx / 36) * 51;
-                int g = ((idx % 36) / 6) * 51;
-                int b = (idx % 6) * 51;
-                return Color.FromRgb((byte)r, (byte)g, (byte)b);
-            }
-            // Grayscale
-            int gray = 8 + (idx - 232) * 10;
-            gray = Math.Min(gray, 238);
-            return Color.FromRgb((byte)gray, (byte)gray, (byte)gray);
-        }
     }
 }
+

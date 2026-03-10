@@ -5,7 +5,7 @@
     "Host": "dockerhome.local",
     "Username": "geertm",
     "Port": 22,
-    "LogoPath": "iconspng\\docker.png",
+    "LogoPath": "ico\\docker.ico",
     "LastConnected": null
   },
   {
@@ -14,7 +14,7 @@
     "Host": "HomeServer.local",
     "Username": "geertm",
     "Port": 22,
-    "LogoPath": "iconspng\\linux.png",
+    "LogoPath": "ico\\linux.ico",
     "LastConnected": null
   }
 ]

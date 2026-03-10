@@ -73,7 +73,7 @@ namespace PowerTerminal.Views
             if (dlg.ShowDialog() == true && Vm.Editing != null)
             {
                 Vm.Editing.LogoPath = dlg.FileName;
-                // If the file is in the iconspng folder, try to select it in the combo
+                // If the file is in the ico folder, try to select it in the combo
                 SyncIconComboBox();
             }
         }

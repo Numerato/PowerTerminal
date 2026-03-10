@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.IO;
 
@@ -11,6 +12,8 @@ namespace PowerTerminal.Services
         private readonly object _aiLock = new();
         private readonly object _wikiLock = new();
 
+        public bool EnableDebugLogging { get; set; }
+
         public LoggingService(string logDir)
         {
             _logDir = logDir;
@@ -20,13 +23,19 @@ namespace PowerTerminal.Services
         // ── Terminal logging ──────────────────────────────────────────────────────
 
         public void LogTerminalInput(string sessionName, string data)
-            => WriteLog("terminal", $"[{Ts()}] [{sessionName}] INPUT: {data}");
+        {
+            if (EnableDebugLogging)
+                 WriteLog("terminal", $"[{Ts()}] [{sessionName}] INPUT: {data}");
+        }
 
         public void LogTerminalOutput(string sessionName, string data)
-            => WriteLog("terminal", $"[{Ts()}] [{sessionName}] OUTPUT: {data}");
+        {
+            if (EnableDebugLogging)
+                 WriteLog("terminal", $"[{Ts()}] [{sessionName}] OUTPUT: {data}");
+        }
 
         public void LogTerminalEvent(string sessionName, string message)
-            => WriteLog("terminal", $"[{Ts()}] [{sessionName}] {message}");
+             => WriteLog("terminal", $"[{Ts()}] [{sessionName}] {message}");
 
         // ── AI logging ────────────────────────────────────────────────────────────
 

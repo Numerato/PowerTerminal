@@ -17,5 +17,6 @@
     "FontSize": 13.0
   },
   "LogDirectory": "logs",
+  "EnableDebugLogging": false,
   "WikiDirectory": "config/wikis"
 }

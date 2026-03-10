@@ -30,7 +30,7 @@
           ClipToBounds="True">
     <Grid>
       <Grid.RowDefinitions>
-        <RowDefinition Height="38" />
+        <RowDefinition Height="34" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
 
@@ -165,11 +165,6 @@
                         MinWidth="240"
                         Padding="0,4">
                   <StackPanel>
-                    <TextBlock Text="Connections"
-                               Foreground="{StaticResource ForegroundDimBrush}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Padding="14,4,14,6" />
                     <ItemsControl ItemsSource="{Binding ConnectionManager.Connections}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -302,6 +297,12 @@
                 <Grid />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemContainerStyle>
+              <Style TargetType="ContentPresenter">
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="VerticalAlignment"   Value="Stretch"/>
+              </Style>
+            </ItemsControl.ItemContainerStyle>
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
                 <views:TerminalTabView

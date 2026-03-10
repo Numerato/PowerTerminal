@@ -259,34 +259,31 @@ namespace PowerTerminal.Services
         {
             _readCts = new CancellationTokenSource();
             var token = _readCts.Token;
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                // Use a large read buffer so a burst of output (e.g. 'apt list') never
-                // stalls in SSH.NET's internal pipe and exhausts the SSH channel window.
                 var buffer = new byte[65536];
-
-                // Capture a local reference; Disconnect() nulls _shellStream concurrently.
                 var stream = _shellStream;
                 while (!token.IsCancellationRequested && stream != null)
                 {
                     try
                     {
-                        // Blocking read — returns as soon as any bytes arrive, with no
-                        // polling sleep.  This keeps the SSH channel window extended and
-                        // prevents server-side processes from blocking on a full write buffer.
-                        int read = stream.Read(buffer, 0, buffer.Length);
-                        if (read > 0)
-                        {
-                            string data = Encoding.UTF8.GetString(buffer, 0, read);
-                            _log.LogTerminalOutput(_sessionName, data.Replace("\r\n", "\\n").Replace("\n", "\\n"));
-                            DataReceived?.Invoke(data);
-                        }
-                        else
-                        {
-                            // 0-byte read means the stream was closed cleanly.
-                            break;
-                        }
+                        // ReadAsync never blocks the thread between reads, so the SSH
+                        // channel receive-window is extended immediately after each chunk
+                        // is consumed — preventing server-side write() stalls (apt list).
+                        int read = await stream.ReadAsync(buffer, 0, buffer.Length, token);
+                        if (read <= 0) break;
+
+                        string data = Encoding.UTF8.GetString(buffer, 0, read);
+
+                        // Log synchronously to avoid thread pool exhaustion during burst reads.
+                        // Since we are now applying backpressure via the UI thread,
+                        // slight IO delays here are acceptable and safer.
+                        var logContent = data.Replace("\r\n", "\\n").Replace("\n", "\\n");
+                        try { _log.LogTerminalOutput(_sessionName, logContent); } catch { }
+
+                        DataReceived?.Invoke(data);
                     }
+                    catch (OperationCanceledException) { break; }
                     catch (Exception ex)
                     {
                         if (!token.IsCancellationRequested)

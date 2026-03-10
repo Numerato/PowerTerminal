@@ -132,20 +132,20 @@ namespace PowerTerminal.ViewModels
         private void LoadIconOptions()
         {
             IconOptions.Clear();
-            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "iconspng");
+            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ico");
             if (!Directory.Exists(iconsDir)) return;
 
             var files = Directory
                 .GetFiles(iconsDir, "*.*")
                 .Where(f => Path.GetExtension(f).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".ico")
-                .OrderBy(f => string.Equals(Path.GetFileName(f), "linux.png",
+                .OrderBy(f => string.Equals(Path.GetFileName(f), "linux.ico",
                                             StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(Path.GetFileName);
 
             foreach (var path in files)
             {
                 // Store as relative path so connections.json stays portable
-                string relativePath = Path.Combine("iconspng", Path.GetFileName(path));
+                string relativePath = Path.Combine("ico", Path.GetFileName(path));
                 IconOptions.Add(new IconOption
                 {
                     DisplayName = Path.GetFileNameWithoutExtension(path),
@@ -157,7 +157,7 @@ namespace PowerTerminal.ViewModels
         private static string? GetDefaultIconPath(string fileName)
         {
             // Return relative path; resolved to full path at display time
-            string relativePath = Path.Combine("iconspng", fileName);
+            string relativePath = Path.Combine("ico", fileName);
             string fullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
             return File.Exists(fullPath) ? relativePath : null;
         }

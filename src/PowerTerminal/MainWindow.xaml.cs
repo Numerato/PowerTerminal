@@ -88,7 +88,10 @@ namespace PowerTerminal
         private void OpenSettings()
         {
             var win = new SettingsWindow { Owner = this };
-            win.ShowDialog();
+            if (win.ShowDialog() == true)
+            {
+                Vm.RefreshSettings();
+            }
         }
 
         private void OpenWikiEditor(WikiEditorViewModel vm)

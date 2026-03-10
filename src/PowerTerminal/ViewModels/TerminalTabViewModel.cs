@@ -22,6 +22,7 @@ namespace PowerTerminal.ViewModels
         private string _statusText = "Disconnected";
         private MachineInfo? _machineInfo;
 
+
         /// <summary>
         /// When true the tab view will call <see cref="ConnectAsync"/> as soon as it loads.
         /// Set by <c>MainViewModel.ConnectToConnection</c>; cleared immediately in OnLoaded
@@ -169,13 +170,11 @@ namespace PowerTerminal.ViewModels
                     return string.Empty;
                 };
 
-                // BeginInvoke (fire-and-forget): the SSH reading thread must NOT block here
-                // waiting for the UI to finish rendering.  Using Invoke() caused the reading
-                // thread to stall while WPF rebuilt thousands of styled lines, exhausting the
-                // SSH channel receive-window and causing the server-side process (e.g. apt list)
-                // to block on write() indefinitely.  BeginInvoke queues the render work and
-                // returns immediately so the reading thread continues draining the channel.
-                _ssh.DataReceived += data => Application.Current?.Dispatcher.BeginInvoke(() => TerminalDataReceived?.Invoke(data));
+
+                // Fire each SSH chunk immediately. Use non-blocking invocation to keep
+                // the SSH pipeline flowing. The UI control (TerminalControl) is now
+                // responsible for thread-safe buffering and flow control.
+                _ssh.DataReceived += data => TerminalDataReceived?.Invoke(data);
                 _ssh.Disconnected += ex =>
                 {
                     Application.Current?.Dispatcher.Invoke(() =>
@@ -212,6 +211,7 @@ namespace PowerTerminal.ViewModels
             StatusText  = "Disconnected";
             Header      = Connection?.Name ?? "Terminal";
         }
+
 
         public void SendData(string data)
         {

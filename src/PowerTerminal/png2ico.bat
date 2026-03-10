@@ -6,8 +6,8 @@ REM Requires ImageMagick (magick) in PATH.
 setlocal enabledelayedexpansion
 
 
-set "SRC=iconspng"
-set "DST=iconspng\ico"
+set "SRC=..\iconspng"
+set "DST=\ico"
 set "RECURSIVE=0"
 
 REM Define sizes to include in the .ico

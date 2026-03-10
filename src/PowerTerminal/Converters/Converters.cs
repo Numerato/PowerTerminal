@@ -96,7 +96,7 @@ namespace PowerTerminal.Converters
             if (!AllowedExtensions.Contains(ext)) return null;
             try
             {
-                // Resolve relative paths (e.g. "iconspng\linux.png") to full file-system path
+                // Resolve relative paths (e.g. "ico\linux.ico") to full file-system path
                 string fullPath = System.IO.Path.IsPathRooted(path)
                     ? path
                     : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);

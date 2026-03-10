@@ -8,6 +8,7 @@ namespace PowerTerminal.Models
         public ThemeSettings Theme { get; set; } = new();
         public string LogDirectory { get; set; } = "logs";
         public string WikiDirectory { get; set; } = "config/wikis";
+        public bool EnableDebugLogging { get; set; } = false;
 
         /// <summary>
         /// Global folder searched for SSH private keys (id_rsa, id_ed25519, …).
