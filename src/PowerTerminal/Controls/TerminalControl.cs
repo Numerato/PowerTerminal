@@ -79,6 +79,7 @@ namespace PowerTerminal.Controls
         private readonly Run _cursorRun;
         private readonly System.Windows.Threading.DispatcherTimer _cursorTimer;
         private bool _cursorVisible = true;
+        private bool _pendingCR;
         private const int CursorBlinkIntervalMs = 530;
 
         private const int MaxParagraphs = 5000;
@@ -256,6 +257,7 @@ namespace PowerTerminal.Controls
             switch (e.Key)
             {
                 case Key.Enter:     return "\r";
+                case Key.Space:     return " ";
                 case Key.Back:      return "\x7f";
                 case Key.Tab:       return "\t";
                 case Key.Escape:    return "\x1b";
@@ -305,6 +307,7 @@ namespace PowerTerminal.Controls
         {
             Dispatcher.Invoke(() =>
             {
+                _pendingCR = false;
                 Document.Blocks.Clear();
                 _currentParagraph = new Paragraph { Margin = new Thickness(0) };
                 _currentParagraph.Inlines.Add(_cursorRun);
@@ -340,6 +343,14 @@ namespace PowerTerminal.Controls
                 return;
             }
 
+            // Lone CR (not followed by LF): move cursor to column 0 — overwrite the current line.
+            // CR+LF pair: treat as a normal newline; the CR just resets the pending flag.
+            if (_pendingCR && ch != '\n')
+            {
+                _pendingCR = false;
+                ClearCurrentLine();
+            }
+
             switch (ch)
             {
                 case '\x1b':
@@ -355,9 +366,10 @@ namespace PowerTerminal.Controls
                     _oscBuffer.Clear();
                     break;
                 case '\r':
-                    // Carriage return – handled with \n
+                    _pendingCR = true;
                     break;
                 case '\n':
+                    _pendingCR = false;
                     // Move cursor to the new paragraph
                     _currentParagraph.Inlines.Remove(_cursorRun);
                     _currentParagraph = new Paragraph { Margin = new Thickness(0) };
@@ -374,6 +386,18 @@ namespace PowerTerminal.Controls
                         AppendChar(ch);
                     break;
             }
+        }
+
+        /// <summary>
+        /// Clears all content from the current line (keeping the cursor run), simulating
+        /// the VT100 "erase to end of line" / carriage-return-overwrite behaviour.
+        /// Must be called on the UI thread.
+        /// </summary>
+        private void ClearCurrentLine()
+        {
+            _currentParagraph.Inlines.Remove(_cursorRun);
+            _currentParagraph.Inlines.Clear();
+            _currentParagraph.Inlines.Add(_cursorRun);
         }
 
         private static bool IsEscapeTerminator(char ch)
@@ -423,7 +447,15 @@ namespace PowerTerminal.Controls
                     if (paramStr == "" || paramStr == "1;1" || paramStr == "0;0")
                         ClearScreen();
                     break;
-                case 'K': // Erase in line - ignore for basic impl
+                case 'K': // Erase in line
+                    // 0 (or omitted) = erase cursor to end; 1 = erase start to cursor; 2 = erase whole line.
+                    // Our cursor is always at end of line in the append model, so 0 and 2 both clear the line.
+                    {
+                        int kParam = 0;
+                        if (paramStr != "" && int.TryParse(paramStr, out int kp)) kParam = kp;
+                        if (kParam == 0 || kParam == 2)
+                            ClearCurrentLine();
+                    }
                     break;
                 // Cursor movement – we rely on the shell to re-draw
                 case 'A': case 'B': case 'C': case 'D':
