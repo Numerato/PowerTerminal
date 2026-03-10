@@ -314,7 +314,7 @@
         </Grid>
 
         <!-- Splitter -->
-        <GridSplitter Grid.Column="1"
+        <GridSplitter Grid.Column="1" Width="2"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
                       ResizeBehavior="PreviousAndNext" />

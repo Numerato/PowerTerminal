@@ -40,5 +40,6 @@ namespace PowerTerminal.Models
         public string AccentColor { get; set; } = "#E87722";
         public string FontFamily { get; set; } = "Cascadia Code, Consolas, Courier New";
         public double FontSize { get; set; } = 13.0;
+        public int Padding { get; set; } = 5;
     }
 }

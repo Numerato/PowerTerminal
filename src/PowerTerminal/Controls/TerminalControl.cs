@@ -75,6 +75,7 @@ namespace PowerTerminal.Controls
         {
             IsReadOnly = true;
             ShowLineNumbers = false;
+            WordWrap = true; // Enable wrapping
             FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New");
             FontSize = 13;
             Background = TerminalBackground;
@@ -84,7 +85,14 @@ namespace PowerTerminal.Controls
             Options.EnableTextDragDrop = false;
             Options.EnableRectangularSelection = false;
             Options.EnableHyperlinks = false;
+            Options.EnableEmailHyperlinks = false;
             Options.AllowScrollBelowDocument = false;
+
+            // Ensure no link generators remain (force removal of built-in ones if options fail)
+            // Using a loop to find and remove types responsible for links without hard dependency on specific class names if possible
+            // but usually it is LinkElementGenerator.
+            // We defer this check to Loaded or just after applying template to be safe,
+            // but constructor is usually fine for default ones.
 
             _segments = new TextSegmentCollection<ColorSegment>(this.Document);
             _colorizer = new AnsiColorizer(_segments);
@@ -172,6 +180,10 @@ namespace PowerTerminal.Controls
             try
             {
                 var sb = new StringBuilder();
+                var newSegments = new List<ColorSegment>();
+
+                int baseOffset = Document.TextLength;
+                int relativeOffset = 0;
                 int charsProcessed = 0;
 
                 while ((charsProcessed < MaxCharsPerFrame || _leftoverStr.Length > 0) && _incomingDataQueue.TryDequeue(out var s))
@@ -182,28 +194,102 @@ namespace PowerTerminal.Controls
                         _leftoverStr = "";
                     }
 
-                    // Simple cleaning for now
+                    // 1. Basic newline cleaning
                     s = s.Replace("\r\n", "\n").Replace("\r", "\n");
 
-                    // 1. Strip Bracketed Paste Mode (\e[?2004h / \e[?2004l)
+                    // 2. Strip Bracketed Paste Mode (\e[?2004h / \e[?2004l)
                     s = Regex.Replace(s, @"\x1b\[\?2004[hl]", "");
 
-                    // 2. Strip Window Title OSC (\e]0;...\a)
+                    // 3. Strip Window Title OSC (\e]0;...\a)
                     s = Regex.Replace(s, @"\x1b\][0-9;]*.*?\x07", "");
 
-                    // Check for Clear Screen sequences before stripping them
-                    if (s.Contains("\x1b[2J") || s.Contains("\x1b[3J") || s.Contains("\x1b[H\x1b[2J"))
-                    {
-                        ClearScreen();
-                        sb.Clear();
-                    }
-
-                    // 3. Strip standard CSI SGR (Color), EL/ED (Erase), and Cursor Move (H)
-                    // Added H and J to the character class to catch [H, [2J, [3J
-                    s = Regex.Replace(s, @"\x1b\[[0-9;]*[mKHJ]", "");
-
-                    sb.Append(s);
                     charsProcessed += s.Length;
+
+                    // 4. Regex split to separate ANSI codes from text
+                    // Splits on CSI (ESC[ ... X) and keeps delimiters
+                    string[] parts = Regex.Split(s, "(\\x1b\\[[0-9;?]*[A-Za-z])");
+
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        string part = parts[i];
+                        if (string.IsNullOrEmpty(part)) continue;
+
+                        if (part.StartsWith("\x1b["))
+                        {
+                            // CSI (Control Sequence Introducer)
+                            char finalChar = part[part.Length - 1];
+                            string csiParam = part.Length >= 3 ? part.Substring(2, part.Length - 3) : string.Empty;
+
+                            switch (finalChar)
+                            {
+                                case 'm':
+                                    // SGR — color/style
+                                    ProcessSgr(csiParam);
+                                    break;
+
+                                case 'J':
+                                    // ED — Erase Display.
+                                    if (csiParam == "2" || csiParam == "3" || csiParam == "" || csiParam == "0")
+                                    {
+                                        // Flush buffer before clearing
+                                        if (sb.Length > 0)
+                                        {
+                                            Document.BeginUpdate();
+                                            try
+                                            {
+                                                Document.Insert(Document.TextLength, sb.ToString());
+                                                foreach (var seg in newSegments)
+                                                {
+                                                    if (seg.StartOffset + seg.Length <= Document.TextLength)
+                                                        _segments.Add(seg);
+                                                }
+                                            }
+                                            finally { Document.EndUpdate(); }
+                                            sb.Clear();
+                                            newSegments.Clear();
+                                        }
+                                        ClearScreen();
+                                        baseOffset = 0;
+                                        relativeOffset = 0;
+                                    }
+                                    break;
+
+                                case 'H':
+                                case 'f':
+                                    // CUP — Cursor Position. Ignored for scrolling terminal.
+                                    break;
+
+                                case 'K':
+                                    // EL — Erase in Line. Ignored.
+                                    break;
+
+                                default:
+                                    // Other CSI — Ignored
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            // Check for partial ANSI sequence at the end
+                            if (i == parts.Length - 1 && part.Contains("\x1b"))
+                            {
+                                int escIndex = part.LastIndexOf('\x1b');
+                                if (escIndex >= 0)
+                                {
+                                    if (escIndex > 0)
+                                    {
+                                        string txt = part.Substring(0, escIndex);
+                                        AddTextSegment(txt, sb, newSegments, baseOffset, ref relativeOffset);
+                                    }
+                                    _leftoverStr = part.Substring(escIndex);
+                                    continue;
+                                }
+                            }
+
+                            // Normal text
+                            AddTextSegment(part, sb, newSegments, baseOffset, ref relativeOffset);
+                        }
+                    }
                 }
 
                 if (sb.Length > 0)
@@ -212,6 +298,11 @@ namespace PowerTerminal.Controls
                     try
                     {
                         Document.Insert(Document.TextLength, sb.ToString());
+                        foreach (var seg in newSegments)
+                        {
+                            if (seg.StartOffset + seg.Length <= Document.TextLength)
+                                _segments.Add(seg);
+                        }
                     }
                     finally
                     {
@@ -262,48 +353,6 @@ namespace PowerTerminal.Controls
             relativeOffset += text.Length;
         }
 
-        private void ProcessSgr(string content)
-        {
-            if (string.IsNullOrEmpty(content))
-            {
-                _currentStyle.Reset();
-                return;
-            }
-
-            var codes = content.Split(';');
-            foreach (var code in codes)
-            {
-                if (int.TryParse(code, out int c))
-                {
-                    switch (c)
-                    {
-                        case 0: _currentStyle.Reset(); break;
-                        case 1: _currentStyle.IsBold = true; break;
-                        case 22: _currentStyle.IsBold = false; break;
-                        case 39: _currentStyle.Foreground = null; break; // Default FG
-                        case 49: _currentStyle.Background = null; break; // Default BG
-
-                        // Foreground 30-37
-                        case >= 30 and <= 37:
-                            _currentStyle.Foreground = AnsiColors[c - 30 + (_currentStyle.IsBold ? 8 : 0)];
-                            break;
-                        // Foreground 90-97
-                        case >= 90 and <= 97:
-                            _currentStyle.Foreground = AnsiColors[c - 90 + 8];
-                            break;
-
-                        // Background 40-47
-                        case >= 40 and <= 47:
-                            _currentStyle.Background = AnsiColors[c - 40];
-                            break;
-                        // Background 100-107
-                        case >= 100 and <= 107:
-                            _currentStyle.Background = AnsiColors[c - 100 + 8];
-                            break;
-                    }
-                }
-            }
-        }
 
         // ── Input Handling ──────────────────────────────────────────────────
 
@@ -449,6 +498,136 @@ namespace PowerTerminal.Controls
 
         // ── ANSI Data Structures ─────────────────────────────────────────────
 
+        private void ProcessSgr(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                _currentStyle.Reset();
+                return;
+            }
+
+            var parts = content.Split(';');
+            var codes = new List<int>();
+            foreach (var p in parts)
+            {
+                if (int.TryParse(p, out int val)) codes.Add(val);
+                else codes.Add(0); // Handle empty/invalid as 0 (Reset) or ignore? Usually 0.
+            }
+
+            if (codes.Count == 0)
+            {
+                _currentStyle.Reset();
+                return;
+            }
+
+            for (int i = 0; i < codes.Count; i++)
+            {
+                int code = codes[i];
+
+                switch (code)
+                {
+                    case 0: _currentStyle.Reset(); break;
+                    case 1: _currentStyle.IsBold = true; break;
+                    case 22: _currentStyle.IsBold = false; break;
+                    case 39: _currentStyle.Foreground = null; break; // Default FG
+                    case 49: _currentStyle.Background = null; break; // Default BG
+
+                    // Foreground Standard (30-37)
+                    case >= 30 and <= 37:
+                        _currentStyle.Foreground = GetAnsiColor(code - 30, _currentStyle.IsBold);
+                        break;
+                    // Foreground Bright (90-97)
+                    case >= 90 and <= 97:
+                        _currentStyle.Foreground = GetAnsiColor(code - 90 + 8, false);
+                        break;
+
+                    // Background Standard (40-47)
+                    case >= 40 and <= 47:
+                        _currentStyle.Background = GetAnsiColor(code - 40, false); // BG rarely bold
+                        break;
+                    // Background Bright (100-107)
+                    case >= 100 and <= 107:
+                        _currentStyle.Background = GetAnsiColor(code - 100 + 8, false);
+                        break;
+
+                    // Extended Colors (38/48)
+                    case 38: // FG
+                    case 48: // BG
+                        if (i + 1 < codes.Count)
+                        {
+                            int type = codes[i + 1];
+                            if (type == 5 && i + 2 < codes.Count)
+                            {
+                                // 256-color: 38;5;n
+                                int colorIndex = codes[i + 2];
+                                var brush = GetXtermColor(colorIndex);
+                                if (code == 38) _currentStyle.Foreground = brush;
+                                else            _currentStyle.Background = brush;
+                                i += 2; // Skip processed
+                            }
+                            else if (type == 2 && i + 4 < codes.Count)
+                            {
+                                // TrueColor: 38;2;r;g;b
+                                byte r = (byte)codes[i + 2];
+                                byte g = (byte)codes[i + 3];
+                                byte b = (byte)codes[i + 4];
+                                var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+                                brush.Freeze();
+                                if (code == 38) _currentStyle.Foreground = brush;
+                                else            _currentStyle.Background = brush;
+                                i += 4; // Skip processed
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        private Brush GetAnsiColor(int index, bool isBold)
+        {
+            // Map 0-7 to 8-15 if bold is active (common terminal behavior for FG)
+            if (isBold && index < 8) index += 8;
+            if (index >= 0 && index < AnsiColors.Length) return AnsiColors[index];
+            return AnsiColors[7]; // Fallback
+        }
+
+        private static readonly ConcurrentDictionary<int, Brush> XtermCache = new();
+
+        private static Brush GetXtermColor(int index)
+        {
+            if (index < 0 || index > 255) return AnsiColors[7]; // Fallback
+            if (index < 16) return AnsiColors[index];           // 0-15 Standard
+
+            return XtermCache.GetOrAdd(index, idx =>
+            {
+                Color c;
+                if (idx >= 16 && idx <= 231)
+                {
+                    // 6x6x6 Color Cube
+                    // (val - 16) = (r * 36) + (g * 6) + b
+                    int val = idx - 16;
+                    int b = val % 6; val /= 6;
+                    int g = val % 6; val /= 6;
+                    int r = val;
+
+                    // Mapping 0..5 to 0..255
+                    // 0->0, 1->95, 2->135, 3->175, 4->215, 5->255
+                    byte ByteMap(int v) => (byte)(v == 0 ? 0 : (v * 40 + 55));
+                    c = Color.FromRgb(ByteMap(r), ByteMap(g), ByteMap(b));
+                }
+                else
+                {
+                    // 232-255 Grayscale Ramp
+                    // (val - 232) * 10 + 8
+                    int gray = (idx - 232) * 10 + 8;
+                    c = Color.FromRgb((byte)gray, (byte)gray, (byte)gray);
+                }
+                var brush = new SolidColorBrush(c);
+                brush.Freeze();
+                return brush;
+            });
+        }
+
         private class TerminalStyle
         {
             public Brush? Foreground;
@@ -512,28 +691,28 @@ namespace PowerTerminal.Controls
             }
         }
 
-        // ── Standard ANSI Colors ──────────────────────────────────────────────
+        // ── Standard ANSI Colors (Ubuntu / Tango Scheme) ──────────────────────
         private static readonly Brush[] AnsiColors =
         {
-            new SolidColorBrush(Color.FromRgb(30, 30, 30)), // 0 Black (adjusted for visibility on dark bg)
-            new SolidColorBrush(Color.FromRgb(197,15,31)), // 1 Red
-            new SolidColorBrush(Color.FromRgb(19,161,14)), // 2 Green
-            new SolidColorBrush(Color.FromRgb(193,156,0)), // 3 Yellow
-            // User requested blue links to be "removed" (changed to default text color)
-            // Was: new SolidColorBrush(Color.FromRgb(59, 142, 234))
-            new SolidColorBrush(Color.FromRgb(204, 204, 204)), // 4 Blue -> Default White/Gray
-            new SolidColorBrush(Color.FromRgb(136,23,152)),// 5 Magenta
-            new SolidColorBrush(Color.FromRgb(58,150,221)),// 6 Cyan
-            new SolidColorBrush(Color.FromRgb(204,204,204)),// 7 White
-            new SolidColorBrush(Color.FromRgb(118,118,118)),// 8 Bright Black
-            new SolidColorBrush(Color.FromRgb(231,72,86)), // 9 Bright Red
-            new SolidColorBrush(Color.FromRgb(22,198,12)), // 10 Bright Green
-            new SolidColorBrush(Color.FromRgb(249,241,165)),// 11 Bright Yellow
-            // Was: new SolidColorBrush(Color.FromRgb(59,120,255))
-            new SolidColorBrush(Color.FromRgb(204, 204, 204)), // 12 Bright Blue -> Default White/Gray
-            new SolidColorBrush(Color.FromRgb(180,0,158)), // 13 Bright Magenta
-            new SolidColorBrush(Color.FromRgb(97,214,214)),// 14 Bright Cyan
-            new SolidColorBrush(Color.FromRgb(242,242,242)),// 15 Bright White
+            // 0-7: Normal
+            new SolidColorBrush(Color.FromRgb(46, 52, 54)),   // 0 Black
+            new SolidColorBrush(Color.FromRgb(204, 0, 0)),    // 1 Red
+            new SolidColorBrush(Color.FromRgb(78, 154, 6)),   // 2 Green
+            new SolidColorBrush(Color.FromRgb(196, 160, 0)),  // 3 Yellow
+            new SolidColorBrush(Color.FromRgb(52, 101, 164)), // 4 Blue (Restored)
+            new SolidColorBrush(Color.FromRgb(117, 80, 123)), // 5 Magenta
+            new SolidColorBrush(Color.FromRgb(6, 152, 154)),  // 6 Cyan
+            new SolidColorBrush(Color.FromRgb(211, 215, 207)),// 7 White
+
+            // 8-15: Bright (Bold)
+            new SolidColorBrush(Color.FromRgb(85, 87, 83)),   // 8 Bright Black
+            new SolidColorBrush(Color.FromRgb(239, 41, 41)),  // 9 Bright Red
+            new SolidColorBrush(Color.FromRgb(138, 226, 52)), // 10 Bright Green
+            new SolidColorBrush(Color.FromRgb(252, 233, 79)), // 11 Bright Yellow
+            new SolidColorBrush(Color.FromRgb(114, 159, 207)),// 12 Bright Blue (Restored)
+            new SolidColorBrush(Color.FromRgb(173, 127, 168)),// 13 Bright Magenta
+            new SolidColorBrush(Color.FromRgb(52, 226, 226)), // 14 Bright Cyan
+            new SolidColorBrush(Color.FromRgb(238, 238, 236)),// 15 Bright White
         };
 
 

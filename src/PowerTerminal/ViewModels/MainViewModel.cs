@@ -104,9 +104,16 @@ namespace PowerTerminal.ViewModels
             // Tabs are opened on demand via the Connect dropdown in the title bar.
         }
 
-        public TerminalTabViewModel AddNewTab()
+        private TerminalTabViewModel AddNewTab()
         {
-            var tab = new TerminalTabViewModel(_log) { Header = $"Terminal {TerminalTabs.Count + 1}" };
+            var settings = _config.LoadSettings();
+            var connection = new SshConnection { Name = "Local Terminal" };
+            var tab = new TerminalTabViewModel(_log)
+            {
+                Connection = connection,
+                Header     = connection.Name,
+                Theme      = settings.Theme
+            };
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
             return tab;
@@ -138,6 +145,7 @@ namespace PowerTerminal.ViewModels
                 Header            = conn.Name,
                 AutoConnectOnLoad = true,
                 SshKeysFolder     = settings.SshKeysFolder,
+                Theme             = settings.Theme
                 // InlinePasswordCollector is wired by TerminalTabView.OnDataContextChanged
                 // when the tab's view is created — no popup dialog needed.
             };

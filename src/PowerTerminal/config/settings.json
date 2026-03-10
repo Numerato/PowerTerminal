@@ -14,7 +14,7 @@
     "Foreground": "#CCCCCC",
     "AccentColor": "#0078D4",
     "FontFamily": "Cascadia Code, Consolas, Courier New",
-    "FontSize": 13.0
+    "FontSize": 15.0
   },
   "LogDirectory": "logs",
   "EnableDebugLogging": false,

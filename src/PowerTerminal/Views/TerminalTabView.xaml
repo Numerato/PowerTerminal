@@ -8,10 +8,11 @@
         <ctrl:TerminalControl x:Name="Terminal"
                               VerticalAlignment="Stretch"
                               HorizontalAlignment="Stretch"
+                              TerminalFontFamily="{Binding Theme.FontFamily}"
+                              TerminalFontSize="{Binding Theme.FontSize}"
+                              Padding="{Binding TerminalPadding}"
                               VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Auto"
-                              FontFamily="Consolas"
-                              FontSize="14" />
+                              HorizontalScrollBarVisibility="Disabled" />
 
     </Grid>
 </UserControl>

@@ -39,6 +39,14 @@ namespace PowerTerminal.ViewModels
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
 
         /// <summary>
+        /// Visual settings for the terminal (font, size, colors, padding).
+        /// Set by <see cref="MainViewModel"/> on creation.
+        /// </summary>
+        public ThemeSettings Theme { get; set; } = new();
+
+        public Thickness TerminalPadding => new Thickness(Theme.Padding);
+
+        /// <summary>
         /// Set by the View (TerminalTabView) to enable inline terminal password collection.
         /// Called from a background SSH thread; the implementation must block until the user
         /// submits the password (or cancels).  Receives the prompt text; returns the password
@@ -149,7 +157,7 @@ namespace PowerTerminal.ViewModels
 
             IsConnecting = true;
             StatusText = $"Connecting to {Connection.Host}…";
-            WriteToTerminal($"\r\nConnecting to {Connection.Username}@{Connection.Host}:{Connection.Port}...\r\n");
+            WriteToTerminal($"Connecting to {Connection.Username}@{Connection.Host}:{Connection.Port}...\r\n");
 
             try
             {
