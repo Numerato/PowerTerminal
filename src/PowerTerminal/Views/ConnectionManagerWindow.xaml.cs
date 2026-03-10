@@ -49,8 +49,11 @@ namespace PowerTerminal.Views
         private void SyncIconComboBox()
         {
             if (Vm?.Editing == null) return;
+            var logoPath = Vm.Editing.LogoPath ?? string.Empty;
+            // Match by relative path or by filename (handles legacy full paths stored in config)
             var match = Vm.IconOptions.FirstOrDefault(o =>
-                string.Equals(o.Path, Vm.Editing.LogoPath, StringComparison.OrdinalIgnoreCase));
+                string.Equals(o.Path, logoPath, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Path.GetFileName(o.Path), Path.GetFileName(logoPath), StringComparison.OrdinalIgnoreCase));
             IconComboBox.SelectedItem = match;
         }
 
@@ -70,7 +73,7 @@ namespace PowerTerminal.Views
             if (dlg.ShowDialog() == true && Vm.Editing != null)
             {
                 Vm.Editing.LogoPath = dlg.FileName;
-                // If the file is in the icons folder, try to select it in the combo
+                // If the file is in the iconspng folder, try to select it in the combo
                 SyncIconComboBox();
             }
         }

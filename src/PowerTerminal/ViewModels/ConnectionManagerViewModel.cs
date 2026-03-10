@@ -132,7 +132,7 @@ namespace PowerTerminal.ViewModels
         private void LoadIconOptions()
         {
             IconOptions.Clear();
-            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icons");
+            string iconsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "iconspng");
             if (!Directory.Exists(iconsDir)) return;
 
             var files = Directory
@@ -144,18 +144,32 @@ namespace PowerTerminal.ViewModels
 
             foreach (var path in files)
             {
+                // Store as relative path so connections.json stays portable
+                string relativePath = Path.Combine("iconspng", Path.GetFileName(path));
                 IconOptions.Add(new IconOption
                 {
                     DisplayName = Path.GetFileNameWithoutExtension(path),
-                    Path        = path
+                    Path        = relativePath
                 });
             }
         }
 
         private static string? GetDefaultIconPath(string fileName)
         {
-            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icons", fileName);
-            return File.Exists(path) ? path : null;
+            // Return relative path; resolved to full path at display time
+            string relativePath = Path.Combine("iconspng", fileName);
+            string fullPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+            return File.Exists(fullPath) ? relativePath : null;
+        }
+
+        /// <summary>
+        /// Resolves a LogoPath (relative or absolute) to a full file-system path for image display.
+        /// </summary>
+        public static string ResolveIconPath(string? logoPath)
+        {
+            if (string.IsNullOrEmpty(logoPath)) return string.Empty;
+            if (Path.IsPathRooted(logoPath)) return logoPath; // custom full path
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, logoPath);
         }
     }
 }

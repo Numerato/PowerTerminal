@@ -365,7 +365,8 @@
         <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
         <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding"         Value="6,4"/>
+        <Setter Property="Height"          Value="28"/>
+        <Setter Property="Padding"         Value="2,2"/>
         <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
         <Setter Property="FontSize"        Value="13"/>
         <Setter Property="CaretBrush"      Value="{StaticResource ForegroundBrush}"/>
@@ -629,15 +630,17 @@
 
     <!-- PasswordBox dark (custom template ensures dark bg/fg are honoured) -->
     <Style TargetType="PasswordBox">
-        <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-        <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
-        <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding"         Value="6,4"/>
-        <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
-        <Setter Property="FontSize"        Value="13"/>
-        <Setter Property="CaretBrush"      Value="{StaticResource ForegroundBrush}"/>
-        <Setter Property="SelectionBrush"  Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="Background"             Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Foreground"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderBrush"            Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness"        Value="1"/>
+        <Setter Property="Height"                 Value="28"/>
+        <Setter Property="Padding"                Value="8,0"/>
+        <Setter Property="FontFamily"             Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"               Value="13"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="CaretBrush"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="SelectionBrush"         Value="{StaticResource SelectionBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
@@ -645,7 +648,9 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="3">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">

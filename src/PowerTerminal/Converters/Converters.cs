@@ -96,9 +96,11 @@ namespace PowerTerminal.Converters
             if (!AllowedExtensions.Contains(ext)) return null;
             try
             {
-                var uri = System.IO.Path.IsPathRooted(path)
-                    ? new Uri(path, UriKind.Absolute)
-                    : new Uri(path, UriKind.RelativeOrAbsolute);
+                // Resolve relative paths (e.g. "iconspng\linux.png") to full file-system path
+                string fullPath = System.IO.Path.IsPathRooted(path)
+                    ? path
+                    : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
+                var uri = new Uri(fullPath, UriKind.Absolute);
                 var img = new BitmapImage();
                 img.BeginInit();
                 img.UriSource   = uri;

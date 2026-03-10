@@ -92,21 +92,21 @@ namespace PowerTerminal.Controls
             Background    = new SolidColorBrush(Color.FromRgb(12, 12, 12));
             Foreground    = new SolidColorBrush(Color.FromRgb(204, 204, 204));
             FontFamily    = new FontFamily("Cascadia Code, Consolas, Courier New");
-            FontSize      = 13;
+            FontSize      = 16;
             BorderThickness = new Thickness(0);
             Padding       = new Thickness(4);
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
 
-            Document.LineHeight = 2;
+            Document.LineHeight = 16;
             Document.Blocks.Clear();
             _currentParagraph.Margin = new Thickness(0);
 
             // Blinking block cursor — always kept as the last inline of _currentParagraph
-            _cursorRun = new Run("▋")
+            _cursorRun = new Run("|")
             {
                 Foreground = new SolidColorBrush(Color.FromRgb(204, 204, 204)),
                 FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New"),
-                FontSize   = 13
+                FontSize   = 16
             };
             _currentParagraph.Inlines.Add(_cursorRun);
             Document.Blocks.Add(_currentParagraph);
