@@ -80,6 +80,7 @@ namespace PowerTerminal.Controls
         private readonly System.Windows.Threading.DispatcherTimer _cursorTimer;
         private bool _cursorVisible = true;
         private bool _pendingCR;
+        private bool _oscPendingEsc;   // true after \x1b inside OSC, waiting for \ (ST)
         private const int CursorBlinkIntervalMs = 530;
 
         private const int MaxParagraphs = 5000;
@@ -308,6 +309,7 @@ namespace PowerTerminal.Controls
             Dispatcher.Invoke(() =>
             {
                 _pendingCR = false;
+                _oscPendingEsc = false;
                 Document.Blocks.Clear();
                 _currentParagraph = new Paragraph { Margin = new Thickness(0) };
                 _currentParagraph.Inlines.Add(_cursorRun);
@@ -317,24 +319,82 @@ namespace PowerTerminal.Controls
 
         private void ParseChar(char ch)
         {
+            // ── OSC (Operating System Command) ─────────────────────────────────────
             if (_inOsc)
             {
-                if (ch == '\x07' || ch == '\x9c')
+                if (_oscPendingEsc)
                 {
-                    _inOsc = false;
-                    _oscBuffer.Clear();
+                    _oscPendingEsc = false;
+                    // ESC \ (String Terminator) ends the OSC; any other char is just discarded.
+                    if (ch == '\\')
+                    {
+                        _inOsc = false;
+                        _oscBuffer.Clear();
+                    }
+                    return;
                 }
-                else
+                switch (ch)
                 {
-                    _oscBuffer.Append(ch);
+                    case '\x07': // BEL — ST shorthand
+                    case '\x9c': // 8-bit ST
+                        _inOsc = false;
+                        _oscBuffer.Clear();
+                        break;
+                    case '\x1b': // possible start of ESC \ (ST)
+                        _oscPendingEsc = true;
+                        break;
+                    default:
+                        _oscBuffer.Append(ch);
+                        break;
                 }
                 return;
             }
 
+            // ── Escape / CSI sequences ─────────────────────────────────────────────
             if (_inEscape)
             {
+                // The very first char after ESC determines the sequence type.
+                if (_escBuffer.Length == 0)
+                {
+                    if (ch == ']')
+                    {
+                        // ESC ] = OSC introducer — switch to OSC mode immediately so that
+                        // the OSC content (e.g. window title) is never printed as plain text.
+                        _inEscape = false;
+                        _inOsc = true;
+                        _oscPendingEsc = false;
+                        _oscBuffer.Clear();
+                        return;
+                    }
+
+                    _escBuffer.Append(ch);
+
+                    // Non-CSI, non-charset-designator: single char after ESC completes the sequence
+                    // (e.g. \x1b= application keypad, \x1b> normal keypad, \x1bM reverse index …).
+                    if (ch != '[' && ch != '(' && ch != ')' && ch != '*' && ch != '+')
+                    {
+                        ProcessEscape(_escBuffer.ToString());
+                        _escBuffer.Clear();
+                        _inEscape = false;
+                    }
+                    return;
+                }
+
+                // Continuation of a multi-character sequence.
                 _escBuffer.Append(ch);
-                if (IsEscapeTerminator(ch))
+                bool terminate;
+                if (_escBuffer[0] == '[')
+                {
+                    // CSI — final byte is in the range 0x40–0x7E (@..~)
+                    terminate = IsEscapeTerminator(ch);
+                }
+                else
+                {
+                    // Charset designators (ESC ( X, ESC ) X, …) — two chars after ESC
+                    terminate = _escBuffer.Length >= 2;
+                }
+
+                if (terminate)
                 {
                     ProcessEscape(_escBuffer.ToString());
                     _escBuffer.Clear();
@@ -363,6 +423,7 @@ namespace PowerTerminal.Controls
                     break;
                 case '\x9d':                  // OSC shortcut
                     _inOsc = true;
+                    _oscPendingEsc = false;
                     _oscBuffer.Clear();
                     break;
                 case '\r':
@@ -402,12 +463,10 @@ namespace PowerTerminal.Controls
 
         private static bool IsEscapeTerminator(char ch)
         {
-            // Multi-char sequence terminator rules:
-            // After ESC [ ... : letter terminates
-            // After ESC ] ... : ST or BEL terminates
-            return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-                   ch == '@' || ch == '`' || ch == '~' ||
-                   (ch == '\\' && !string.IsNullOrEmpty(string.Empty)); // ESC-only
+            // CSI final byte: 0x40 ('@') through 0x7E ('~') per VT100 spec.
+            // Parameter bytes (0x30-0x3F: digits, ';', ':', '<', '=', '>', '?') and
+            // intermediate bytes (0x20-0x2F) are all below 0x40 and never trigger this.
+            return ch >= '@' && ch <= '~';
         }
 
         private void ProcessEscape(string seq)
