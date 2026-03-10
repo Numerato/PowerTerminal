@@ -169,7 +169,13 @@ namespace PowerTerminal.ViewModels
                     return string.Empty;
                 };
 
-                _ssh.DataReceived += data => Application.Current?.Dispatcher.Invoke(() => TerminalDataReceived?.Invoke(data));
+                // BeginInvoke (fire-and-forget): the SSH reading thread must NOT block here
+                // waiting for the UI to finish rendering.  Using Invoke() caused the reading
+                // thread to stall while WPF rebuilt thousands of styled lines, exhausting the
+                // SSH channel receive-window and causing the server-side process (e.g. apt list)
+                // to block on write() indefinitely.  BeginInvoke queues the render work and
+                // returns immediately so the reading thread continues draining the channel.
+                _ssh.DataReceived += data => Application.Current?.Dispatcher.BeginInvoke(() => TerminalDataReceived?.Invoke(data));
                 _ssh.Disconnected += ex =>
                 {
                     Application.Current?.Dispatcher.Invoke(() =>
