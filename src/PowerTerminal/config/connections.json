@@ -1,11 +1,20 @@
 [
   {
     "Id": "a1b2c3d4-0000-0000-0000-000000000001",
-    "Name": "dockerhome",
+    "Name": "DockerHome",
     "Host": "dockerhome.local",
-    "Username": "Geertm",
+    "Username": "geertm",
     "Port": 22,
-    "PrivateKeyPath": null,
+    "LogoPath": "iconspng\\docker.png",
+    "LastConnected": null
+  },
+  {
+    "Id": "9d23a483-5815-4188-81f2-1de4216ab322",
+    "Name": "HomeServer",
+    "Host": "HomeServer.local",
+    "Username": "geertm",
+    "Port": 22,
+    "LogoPath": "iconspng\\linux.png",
     "LastConnected": null
   }
 ]
