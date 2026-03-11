@@ -162,8 +162,15 @@ dotnet restore PowerTerminal.sln
 # Build (Debug)
 dotnet build PowerTerminal.sln
 
+# Build (Release)
+dotnet build PowerTerminal.sln -c Release
+
 # Run directly
 dotnet run --project src/PowerTerminal/PowerTerminal.csproj
+
+# Run with explicit launch profile
+dotnet run --project src/PowerTerminal/PowerTerminal.csproj --launch-profile "PowerTerminal (Debug)"
+dotnet run --project src/PowerTerminal/PowerTerminal.csproj -c Release --launch-profile "PowerTerminal (Release)"
 
 # Publish (Release, framework-dependent — requires .NET 8 on target machine)
 dotnet publish src/PowerTerminal/PowerTerminal.csproj -c Release -r win-x64 -o ./publish
