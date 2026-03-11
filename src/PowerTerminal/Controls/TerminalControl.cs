@@ -1,25 +1,24 @@
 #nullable enable
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
-using ICSharpCode.AvalonEdit.Highlighting;
-using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using System.Text.RegularExpressions;
 
 namespace PowerTerminal.Controls
 {
     /// <summary>
-    /// A simple VT100/ANSI terminal emulator control rendered in a WPF RichTextBox.
-    /// Supports color attributes, basic cursor movement, and screen scrollback.
+    /// A VT100/xterm terminal emulator control backed by a 2D character buffer.
+    /// Renders into an AvalonEdit TextEditor. Supports full cursor positioning,
+    /// scrolling regions, alternate screen buffer, and 256/TrueColor.
     /// </summary>
     public class TerminalControl : TextEditor
     {
@@ -46,9 +45,14 @@ namespace PowerTerminal.Controls
             set => SetValue(TerminalFontSizeProperty, value);
         }
 
+        // ── Terminal buffer ──────────────────────────────────────────────────
+        private TerminalBuffer _buffer;
+        private const int DefaultRows = 24;
+        private const int DefaultCols = 80;
+
+        // ── Rendering ────────────────────────────────────────────────────────
         private readonly TextSegmentCollection<ColorSegment> _segments;
         private readonly AnsiColorizer _colorizer;
-        private TerminalStyle _currentStyle = new();
 
         public event Action<string>? UserInput;
 
@@ -57,10 +61,10 @@ namespace PowerTerminal.Controls
         private string _leftoverStr = "";
         private int _isRendering;
 
-        private static readonly SolidColorBrush TerminalForeground = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-        private static readonly SolidColorBrush TerminalBackground = new SolidColorBrush(Color.FromRgb(12, 12, 12));
-        private static readonly SolidColorBrush TerminalCaret      = new SolidColorBrush(Color.FromRgb(204, 204, 204));
-        private static readonly SolidColorBrush TerminalSelection  = new SolidColorBrush(Color.FromArgb(120, 92, 40, 0));
+        private static readonly SolidColorBrush TerminalForeground = new(Color.FromRgb(204, 204, 204));
+        private static readonly SolidColorBrush TerminalBackground = new(Color.FromRgb(12, 12, 12));
+        private static readonly SolidColorBrush TerminalCaret      = new(Color.FromRgb(204, 204, 204));
+        private static readonly SolidColorBrush TerminalSelection  = new(Color.FromArgb(120, 92, 40, 0));
 
         static TerminalControl()
         {
@@ -73,9 +77,11 @@ namespace PowerTerminal.Controls
 
         public TerminalControl()
         {
+            _buffer = new TerminalBuffer(DefaultRows, DefaultCols);
+
             IsReadOnly = true;
             ShowLineNumbers = false;
-            WordWrap = true; // Enable wrapping
+            WordWrap = false;
             FontFamily = new FontFamily("Cascadia Code, Consolas, Courier New");
             FontSize = 13;
             Background = TerminalBackground;
@@ -87,12 +93,6 @@ namespace PowerTerminal.Controls
             Options.EnableHyperlinks = false;
             Options.EnableEmailHyperlinks = false;
             Options.AllowScrollBelowDocument = false;
-
-            // Ensure no link generators remain (force removal of built-in ones if options fail)
-            // Using a loop to find and remove types responsible for links without hard dependency on specific class names if possible
-            // but usually it is LinkElementGenerator.
-            // We defer this check to Loaded or just after applying template to be safe,
-            // but constructor is usually fine for default ones.
 
             _segments = new TextSegmentCollection<ColorSegment>(this.Document);
             _colorizer = new AnsiColorizer(_segments);
@@ -129,24 +129,15 @@ namespace PowerTerminal.Controls
         public override void OnApplyTemplate()
         {
             base.OnApplyTemplate();
-            // Re-apply after the control template is fully instantiated, so
-            // TextArea.Foreground / caret / selection are definitely set.
             ApplyTerminalColors();
         }
 
         private void ApplyTerminalColors()
         {
-            // AvalonEdit renders text through TextArea → TextView, not through
-            // the outer TextEditor's Foreground property.  We must set the colors
-            // explicitly on the TextArea so the DrawingContext picks them up.
             TextArea.Foreground        = TerminalForeground;
             TextArea.Background        = TerminalBackground;
             TextArea.TextView.NonPrintableCharacterBrush = TerminalForeground;
-
-            // Caret
             TextArea.Caret.CaretBrush = TerminalCaret;
-
-            // Selection highlight
             TextArea.SelectionBrush  = TerminalSelection;
             TextArea.SelectionForeground = TerminalForeground;
         }
@@ -155,13 +146,10 @@ namespace PowerTerminal.Controls
 
         public void ClearScreen()
         {
-            Document.Text = "";
-            _segments.Clear();
-            _currentStyle = new TerminalStyle();
+            _buffer.FullReset();
+            RenderBuffer();
             _leftoverStr = "";
         }
-
-        private const int MaxCharsPerFrame = 10000; // Limit processing to prevent freeze
 
         public void AppendAnsiData(string data)
         {
@@ -170,23 +158,22 @@ namespace PowerTerminal.Controls
 
             if (Interlocked.CompareExchange(ref _isRendering, 1, 0) == 0)
             {
-
                 Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Normal);
             }
         }
+
+        // ── Escape Sequence Parser (character-by-character) ──────────────────
+
+        private const int MaxCharsPerFrame = 50000;
 
         private void ProcessQueue()
         {
             try
             {
-                var sb = new StringBuilder();
-                var newSegments = new List<ColorSegment>();
-
-                int baseOffset = Document.TextLength;
-                int relativeOffset = 0;
                 int charsProcessed = 0;
 
-                while ((charsProcessed < MaxCharsPerFrame || _leftoverStr.Length > 0) && _incomingDataQueue.TryDequeue(out var s))
+                while ((charsProcessed < MaxCharsPerFrame || _leftoverStr.Length > 0)
+                       && _incomingDataQueue.TryDequeue(out var s))
                 {
                     if (_leftoverStr.Length > 0)
                     {
@@ -194,126 +181,19 @@ namespace PowerTerminal.Controls
                         _leftoverStr = "";
                     }
 
-                    // 1. Basic newline cleaning
-                    s = s.Replace("\r\n", "\n").Replace("\r", "\n");
-
-                    // 2. Strip Bracketed Paste Mode (\e[?2004h / \e[?2004l)
-                    s = Regex.Replace(s, @"\x1b\[\?2004[hl]", "");
-
-                    // 3. Strip Window Title OSC (\e]0;...\a)
-                    s = Regex.Replace(s, @"\x1b\][0-9;]*.*?\x07", "");
-
                     charsProcessed += s.Length;
-
-                    // 4. Regex split to separate ANSI codes from text
-                    // Splits on CSI (ESC[ ... X) and keeps delimiters
-                    string[] parts = Regex.Split(s, "(\\x1b\\[[0-9;?]*[A-Za-z])");
-
-                    for (int i = 0; i < parts.Length; i++)
-                    {
-                        string part = parts[i];
-                        if (string.IsNullOrEmpty(part)) continue;
-
-                        if (part.StartsWith("\x1b["))
-                        {
-                            // CSI (Control Sequence Introducer)
-                            char finalChar = part[part.Length - 1];
-                            string csiParam = part.Length >= 3 ? part.Substring(2, part.Length - 3) : string.Empty;
-
-                            switch (finalChar)
-                            {
-                                case 'm':
-                                    // SGR — color/style
-                                    ProcessSgr(csiParam);
-                                    break;
-
-                                case 'J':
-                                    // ED — Erase Display.
-                                    if (csiParam == "2" || csiParam == "3" || csiParam == "" || csiParam == "0")
-                                    {
-                                        // Flush buffer before clearing
-                                        if (sb.Length > 0)
-                                        {
-                                            Document.BeginUpdate();
-                                            try
-                                            {
-                                                Document.Insert(Document.TextLength, sb.ToString());
-                                                foreach (var seg in newSegments)
-                                                {
-                                                    if (seg.StartOffset + seg.Length <= Document.TextLength)
-                                                        _segments.Add(seg);
-                                                }
-                                            }
-                                            finally { Document.EndUpdate(); }
-                                            sb.Clear();
-                                            newSegments.Clear();
-                                        }
-                                        ClearScreen();
-                                        baseOffset = 0;
-                                        relativeOffset = 0;
-                                    }
-                                    break;
-
-                                case 'H':
-                                case 'f':
-                                    // CUP — Cursor Position. Ignored for scrolling terminal.
-                                    break;
-
-                                case 'K':
-                                    // EL — Erase in Line. Ignored.
-                                    break;
-
-                                default:
-                                    // Other CSI — Ignored
-                                    break;
-                            }
-                        }
-                        else
-                        {
-                            // Check for partial ANSI sequence at the end
-                            if (i == parts.Length - 1 && part.Contains("\x1b"))
-                            {
-                                int escIndex = part.LastIndexOf('\x1b');
-                                if (escIndex >= 0)
-                                {
-                                    if (escIndex > 0)
-                                    {
-                                        string txt = part.Substring(0, escIndex);
-                                        AddTextSegment(txt, sb, newSegments, baseOffset, ref relativeOffset);
-                                    }
-                                    _leftoverStr = part.Substring(escIndex);
-                                    continue;
-                                }
-                            }
-
-                            // Normal text
-                            AddTextSegment(part, sb, newSegments, baseOffset, ref relativeOffset);
-                        }
-                    }
+                    ParseData(s);
                 }
 
-                if (sb.Length > 0)
+                if (_buffer.IsDirty)
                 {
-                    Document.BeginUpdate();
-                    try
-                    {
-                        Document.Insert(Document.TextLength, sb.ToString());
-                        foreach (var seg in newSegments)
-                        {
-                            if (seg.StartOffset + seg.Length <= Document.TextLength)
-                                _segments.Add(seg);
-                        }
-                    }
-                    finally
-                    {
-                        Document.EndUpdate();
-                    }
-                    ScrollToEnd();
+                    RenderBuffer();
+                    _buffer.IsDirty = false;
                 }
             }
             catch (Exception ex)
             {
-                try { Document.Insert(Document.TextLength, $"\r\n[Error: {ex.Message}]\r\n"); } catch { }
+                try { Document.Insert(Document.TextLength, $"\n[Error: {ex.Message}]\n"); } catch { }
             }
             finally
             {
@@ -329,30 +209,667 @@ namespace PowerTerminal.Controls
             }
         }
 
-        private void AddTextSegment(string text, StringBuilder sb, List<ColorSegment> segments, int baseOffset, ref int relativeOffset)
+        /// <summary>
+        /// Parse incoming data character-by-character, dispatching to the buffer
+        /// or escape sequence handlers as appropriate.
+        /// </summary>
+        private void ParseData(string data)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            int i = 0;
+            int len = data.Length;
 
-            // Normalise line endings: \r\n → \n, lone \r → \n.
-            // AvalonEdit expects \n (or \r\n) but lone \r causes the cursor to
-            // overwrite the start of the current line, making output appear blank.
-            text = text.Replace("\r\n", "\n").Replace("\r", "\n");
-
-            if (_currentStyle.IsNonDefault && text.Length > 0)
+            while (i < len)
             {
-                segments.Add(new ColorSegment
+                char c = data[i];
+
+                if (c == '\x1b') // ESC
                 {
-                    StartOffset = baseOffset + relativeOffset,
-                    Length = text.Length,
-                    Foreground = _currentStyle.Foreground,
-                    Background = _currentStyle.Background,
-                    IsBold = _currentStyle.IsBold
-                });
+                    if (i + 1 >= len)
+                    {
+                        // Incomplete escape — save for next chunk
+                        _leftoverStr = data.Substring(i);
+                        return;
+                    }
+
+                    char next = data[i + 1];
+
+                    if (next == '[')
+                    {
+                        // CSI sequence: ESC [ ...
+                        i = ParseCsi(data, i + 2);
+                    }
+                    else if (next == ']')
+                    {
+                        // OSC sequence: ESC ] ... BEL/ST
+                        i = ParseOsc(data, i + 2);
+                    }
+                    else if (next == '(' || next == ')')
+                    {
+                        // Character set designation — skip (ESC ( X or ESC ) X)
+                        i = i + 2 < len ? i + 3 : len;
+                    }
+                    else
+                    {
+                        // Single-character ESC sequences
+                        ProcessEscChar(next);
+                        i += 2;
+                    }
+                }
+                else if (c < ' ' || c == '\x7f')
+                {
+                    // Control character
+                    ProcessControlChar(c);
+                    i++;
+                }
+                else
+                {
+                    // Regular printable character — batch for efficiency
+                    int start = i;
+                    while (i < len && data[i] >= ' ' && data[i] != '\x1b' && data[i] != '\x7f')
+                        i++;
+
+                    // Write batch of characters
+                    for (int j = start; j < i; j++)
+                        _buffer.WriteChar(data[j]);
+                }
             }
-            sb.Append(text);
-            relativeOffset += text.Length;
         }
 
+        /// <summary>Parse a CSI sequence starting after ESC[. Returns next index.</summary>
+        private int ParseCsi(string data, int start)
+        {
+            int i = start;
+            int len = data.Length;
+
+            // Collect prefix character (?, >, !)
+            string prefix = "";
+            if (i < len && (data[i] == '?' || data[i] == '>' || data[i] == '!'))
+            {
+                prefix = data[i].ToString();
+                i++;
+            }
+
+            // Collect parameter string (digits and semicolons)
+            int paramStart = i;
+            while (i < len && (char.IsDigit(data[i]) || data[i] == ';'))
+                i++;
+
+            if (i >= len)
+            {
+                // Incomplete CSI sequence — save for next chunk
+                _leftoverStr = data.Substring(start - 2); // include ESC[
+                return len;
+            }
+
+            char finalChar = data[i];
+            string paramStr = data.Substring(paramStart, i - paramStart);
+
+            if (prefix.Length > 0)
+                ProcessCsiPrivate(prefix, paramStr, finalChar);
+            else
+                ProcessCsiSequence(paramStr, finalChar);
+
+            return i + 1;
+        }
+
+        /// <summary>Parse an OSC sequence starting after ESC]. Returns next index.</summary>
+        private int ParseOsc(string data, int start)
+        {
+            int i = start;
+            int len = data.Length;
+
+            // Find terminator: BEL (\x07) or ST (ESC \)
+            while (i < len)
+            {
+                if (data[i] == '\x07')
+                    return i + 1; // skip BEL
+                if (data[i] == '\x1b' && i + 1 < len && data[i + 1] == '\\')
+                    return i + 2; // skip ST
+                i++;
+            }
+
+            // Incomplete OSC — save for next chunk
+            _leftoverStr = data.Substring(start - 2);
+            return len;
+        }
+
+        /// <summary>Handle single-character ESC sequences (ESC X).</summary>
+        private void ProcessEscChar(char c)
+        {
+            switch (c)
+            {
+                case 'D': // IND — Index (move cursor down, scroll if needed)
+                    _buffer.IndexDown();
+                    break;
+                case 'M': // RI — Reverse Index (move cursor up, scroll down if needed)
+                    _buffer.ReverseIndex();
+                    break;
+                case 'E': // NEL — Next Line
+                    _buffer.CarriageReturn();
+                    _buffer.IndexDown();
+                    break;
+                case '7': // DECSC — Save Cursor
+                    _buffer.SaveCursor();
+                    break;
+                case '8': // DECRC — Restore Cursor
+                    _buffer.RestoreCursor();
+                    break;
+                case 'c': // RIS — Full Reset
+                    _buffer.FullReset();
+                    break;
+                case 'H': // HTS — Set Tab Stop (ignored)
+                    break;
+                case '=': // DECKPAM — Application Keypad Mode (ignored)
+                case '>': // DECKPNM — Numeric Keypad Mode (ignored)
+                    break;
+            }
+        }
+
+        /// <summary>Handle control characters (0x00–0x1F, 0x7F).</summary>
+        private void ProcessControlChar(char c)
+        {
+            switch (c)
+            {
+                case '\n': // LF
+                case '\x0b': // VT (vertical tab — treated as LF)
+                case '\x0c': // FF (form feed — treated as LF)
+                    _buffer.LineFeed();
+                    break;
+                case '\r': // CR
+                    _buffer.CarriageReturn();
+                    break;
+                case '\x08': // BS
+                    _buffer.Backspace();
+                    break;
+                case '\t': // HT
+                    _buffer.Tab();
+                    break;
+                case '\x07': // BEL
+                    _buffer.Bell();
+                    break;
+                // Other control characters are ignored
+            }
+        }
+
+        /// <summary>Dispatch standard CSI sequences (no prefix).</summary>
+        private void ProcessCsiSequence(string paramStr, char finalChar)
+        {
+            int[] parms = ParseParams(paramStr);
+
+            switch (finalChar)
+            {
+                case 'm': // SGR — Select Graphic Rendition
+                    ProcessSgr(parms);
+                    break;
+
+                case 'A': // CUU — Cursor Up
+                    _buffer.CursorUp(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'B': // CUD — Cursor Down
+                    _buffer.CursorDown(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'C': // CUF — Cursor Forward
+                    _buffer.CursorForward(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'D': // CUB — Cursor Backward
+                    _buffer.CursorBackward(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'E': // CNL — Cursor Next Line
+                    _buffer.CursorNextLine(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'F': // CPL — Cursor Previous Line
+                    _buffer.CursorPreviousLine(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'G': // CHA — Cursor Character Absolute (column)
+                    _buffer.CursorToColumn(Param(parms, 0, 1) - 1); // 1-based → 0-based
+                    break;
+                case 'H': // CUP — Cursor Position
+                case 'f': // HVP — Horizontal and Vertical Position
+                    _buffer.SetCursorPosition(
+                        Param(parms, 0, 1) - 1, // row: 1-based → 0-based
+                        Param(parms, 1, 1) - 1); // col: 1-based → 0-based
+                    break;
+                case 'J': // ED — Erase in Display
+                    _buffer.EraseDisplay(Param(parms, 0, 0));
+                    break;
+                case 'K': // EL — Erase in Line
+                    _buffer.EraseLine(Param(parms, 0, 0));
+                    break;
+                case 'L': // IL — Insert Lines
+                    _buffer.InsertLines(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'M': // DL — Delete Lines
+                    _buffer.DeleteLines(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'P': // DCH — Delete Characters
+                    _buffer.DeleteCharacters(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'S': // SU — Scroll Up
+                    _buffer.ScrollUp(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'T': // SD — Scroll Down
+                    _buffer.ScrollDown(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'X': // ECH — Erase Characters
+                    _buffer.EraseCharacters(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case '@': // ICH — Insert Characters
+                    _buffer.InsertCharacters(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'd': // VPA — Vertical Position Absolute (row)
+                    _buffer.CursorToRow(Param(parms, 0, 1) - 1); // 1-based → 0-based
+                    break;
+                case 'r': // DECSTBM — Set Scrolling Region
+                    {
+                        int top = Param(parms, 0, 1) - 1;
+                        int bottom = Param(parms, 1, _buffer.Rows) - 1;
+                        _buffer.SetScrollRegion(top, bottom);
+                    }
+                    break;
+                case 's': // Save Cursor Position
+                    _buffer.SaveCursor();
+                    break;
+                case 'u': // Restore Cursor Position
+                    _buffer.RestoreCursor();
+                    break;
+                case 'n': // DSR — Device Status Report
+                    if (Param(parms, 0, 0) == 6)
+                    {
+                        // Cursor position report: ESC[row;colR
+                        string report = $"\x1b[{_buffer.CursorRow + 1};{_buffer.CursorCol + 1}R";
+                        UserInput?.Invoke(report);
+                    }
+                    break;
+                case 'c': // DA — Device Attributes
+                    UserInput?.Invoke("\x1b[?1;2c"); // VT100 with advanced video
+                    break;
+                case 'b': // REP — Repeat preceding character
+                    // Ignored for simplicity
+                    break;
+            }
+        }
+
+        /// <summary>Dispatch CSI sequences with a private prefix (?, >, !).</summary>
+        private void ProcessCsiPrivate(string prefix, string paramStr, char finalChar)
+        {
+            int[] parms = ParseParams(paramStr);
+
+            if (prefix == "?")
+            {
+                switch (finalChar)
+                {
+                    case 'h': // DECSET
+                        for (int j = 0; j < parms.Length; j++) DecSet(parms[j]);
+                        break;
+                    case 'l': // DECRST
+                        for (int j = 0; j < parms.Length; j++) DecReset(parms[j]);
+                        break;
+                }
+            }
+            // Other private prefixes (>, !) are ignored
+        }
+
+        /// <summary>DECSET — enable private mode.</summary>
+        private void DecSet(int mode)
+        {
+            switch (mode)
+            {
+                case 1: // Application Cursor Keys
+                    _buffer.ApplicationCursorKeys = true;
+                    break;
+                case 7: // Auto-wrap
+                    _buffer.AutoWrap = true;
+                    break;
+                case 12: // Start blinking cursor (ignored)
+                    break;
+                case 25: // Show cursor
+                    _buffer.CursorVisible = true;
+                    break;
+                case 47: // Use Alternate Screen Buffer (old)
+                    _buffer.SwitchToAlternateBuffer();
+                    break;
+                case 1047: // Use Alternate Screen Buffer
+                    _buffer.SwitchToAlternateBuffer();
+                    break;
+                case 1048: // Save Cursor
+                    _buffer.SaveCursor();
+                    break;
+                case 1049: // Save Cursor + Alternate Buffer (the main one vim/nano use)
+                    _buffer.SaveCursor();
+                    _buffer.SwitchToAlternateBuffer();
+                    break;
+                case 2004: // Enable Bracketed Paste Mode
+                    _buffer.BracketedPasteMode = true;
+                    break;
+            }
+        }
+
+        /// <summary>DECRST — disable private mode.</summary>
+        private void DecReset(int mode)
+        {
+            switch (mode)
+            {
+                case 1: // Normal Cursor Keys
+                    _buffer.ApplicationCursorKeys = false;
+                    break;
+                case 7: // No auto-wrap
+                    _buffer.AutoWrap = false;
+                    break;
+                case 12: // Stop blinking cursor (ignored)
+                    break;
+                case 25: // Hide cursor
+                    _buffer.CursorVisible = false;
+                    break;
+                case 47: // Use Normal Screen Buffer (old)
+                    _buffer.SwitchToNormalBuffer();
+                    break;
+                case 1047: // Use Normal Screen Buffer
+                    _buffer.SwitchToNormalBuffer();
+                    break;
+                case 1048: // Restore Cursor
+                    _buffer.RestoreCursor();
+                    break;
+                case 1049: // Restore Cursor + Normal Buffer
+                    _buffer.SwitchToNormalBuffer();
+                    _buffer.RestoreCursor();
+                    break;
+                case 2004: // Disable Bracketed Paste Mode
+                    _buffer.BracketedPasteMode = false;
+                    break;
+            }
+        }
+
+        // ── SGR Processing ───────────────────────────────────────────────────
+
+        private void ProcessSgr(int[] codes)
+        {
+            if (codes.Length == 0)
+            {
+                _buffer.CurrentStyle.Reset();
+                return;
+            }
+
+            for (int i = 0; i < codes.Length; i++)
+            {
+                int code = codes[i];
+
+                switch (code)
+                {
+                    case 0: _buffer.CurrentStyle.Reset(); break;
+                    case 1: _buffer.CurrentStyle.IsBold = true; break;
+                    case 2: _buffer.CurrentStyle.IsDim = true; break;
+                    case 3: _buffer.CurrentStyle.IsItalic = true; break;
+                    case 4: _buffer.CurrentStyle.IsUnderline = true; break;
+                    case 7: _buffer.CurrentStyle.IsInverse = true; break;
+                    case 9: _buffer.CurrentStyle.IsStrikethrough = true; break;
+                    case 21: _buffer.CurrentStyle.IsUnderline = true; break; // Double underline → underline
+                    case 22: _buffer.CurrentStyle.IsBold = false; _buffer.CurrentStyle.IsDim = false; break;
+                    case 23: _buffer.CurrentStyle.IsItalic = false; break;
+                    case 24: _buffer.CurrentStyle.IsUnderline = false; break;
+                    case 27: _buffer.CurrentStyle.IsInverse = false; break;
+                    case 29: _buffer.CurrentStyle.IsStrikethrough = false; break;
+                    case 39: _buffer.CurrentStyle.Foreground = null; break; // Default FG
+                    case 49: _buffer.CurrentStyle.Background = null; break; // Default BG
+
+                    // Foreground Standard (30-37)
+                    case >= 30 and <= 37:
+                        _buffer.CurrentStyle.Foreground = GetAnsiColor(code - 30, _buffer.CurrentStyle.IsBold);
+                        break;
+                    // Foreground Bright (90-97)
+                    case >= 90 and <= 97:
+                        _buffer.CurrentStyle.Foreground = GetAnsiColor(code - 90 + 8, false);
+                        break;
+
+                    // Background Standard (40-47)
+                    case >= 40 and <= 47:
+                        _buffer.CurrentStyle.Background = GetAnsiColor(code - 40, false);
+                        break;
+                    // Background Bright (100-107)
+                    case >= 100 and <= 107:
+                        _buffer.CurrentStyle.Background = GetAnsiColor(code - 100 + 8, false);
+                        break;
+
+                    // Extended Colors (38/48)
+                    case 38: // FG
+                    case 48: // BG
+                        if (i + 1 < codes.Length)
+                        {
+                            int type = codes[i + 1];
+                            if (type == 5 && i + 2 < codes.Length)
+                            {
+                                // 256-color: 38;5;n
+                                int colorIndex = codes[i + 2];
+                                var brush = GetXtermColor(colorIndex);
+                                if (code == 38) _buffer.CurrentStyle.Foreground = brush;
+                                else            _buffer.CurrentStyle.Background = brush;
+                                i += 2;
+                            }
+                            else if (type == 2 && i + 4 < codes.Length)
+                            {
+                                // TrueColor: 38;2;r;g;b
+                                byte r = (byte)Math.Clamp(codes[i + 2], 0, 255);
+                                byte g = (byte)Math.Clamp(codes[i + 3], 0, 255);
+                                byte b = (byte)Math.Clamp(codes[i + 4], 0, 255);
+                                var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+                                brush.Freeze();
+                                if (code == 38) _buffer.CurrentStyle.Foreground = brush;
+                                else            _buffer.CurrentStyle.Background = brush;
+                                i += 4;
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        // ── Buffer Rendering ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Serialize the terminal buffer (scrollback + visible screen) into the
+        /// AvalonEdit document and create color segments for styled cells.
+        /// </summary>
+        private void RenderBuffer()
+        {
+            var sb = new StringBuilder();
+            var newSegments = new List<ColorSegment>();
+            int offset = 0;
+
+            // 1. Render scrollback (primary buffer only, not in alternate mode)
+            if (!_buffer.IsAlternateBuffer)
+            {
+                var scrollback = _buffer.Scrollback;
+                for (int i = 0; i < scrollback.Count; i++)
+                {
+                    var row = scrollback[i];
+                    int lineStart = offset;
+                    int lastNonSpace = -1;
+
+                    for (int c = 0; c < row.Length; c++)
+                    {
+                        char ch = row[c].Character;
+                        if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                    }
+
+                    // Render up to last non-space character
+                    for (int c = 0; c <= lastNonSpace; c++)
+                    {
+                        char ch = row[c].Character;
+                        if (ch == '\0') ch = ' ';
+                        sb.Append(ch);
+
+                        if (row[c].Style.IsNonDefault)
+                        {
+                            AddSegment(newSegments, offset, 1, row[c].Style);
+                        }
+                        offset++;
+                    }
+
+                    sb.Append('\n');
+                    offset++;
+                }
+            }
+
+            // 2. Render visible screen
+            for (int r = 0; r < _buffer.Rows; r++)
+            {
+                int lineStart = offset;
+                int lastNonSpace = -1;
+
+                // Find last non-space character on this row
+                for (int c = 0; c < _buffer.Cols; c++)
+                {
+                    char ch = _buffer.GetCell(r, c).Character;
+                    if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                }
+
+                // Always render at least one column (even if empty) for cursor visibility
+                int renderTo = lastNonSpace;
+
+                // If cursor is on this row, extend rendering to cursor position
+                if (r == _buffer.CursorRow)
+                    renderTo = Math.Max(renderTo, _buffer.CursorCol);
+
+                for (int c = 0; c <= renderTo; c++)
+                {
+                    var cell = _buffer.GetCell(r, c);
+                    char ch = cell.Character;
+                    if (ch == '\0') ch = ' ';
+                    sb.Append(ch);
+
+                    if (cell.Style.IsNonDefault)
+                    {
+                        AddSegment(newSegments, offset, 1, cell.Style);
+                    }
+                    offset++;
+                }
+
+                // Add newline for all rows except the last
+                if (r < _buffer.Rows - 1)
+                {
+                    sb.Append('\n');
+                    offset++;
+                }
+            }
+
+            // 3. Update document
+            Document.BeginUpdate();
+            try
+            {
+                _segments.Clear();
+                Document.Text = sb.ToString();
+
+                foreach (var seg in newSegments)
+                {
+                    if (seg.StartOffset + seg.Length <= Document.TextLength)
+                        _segments.Add(seg);
+                }
+            }
+            finally
+            {
+                Document.EndUpdate();
+            }
+
+            // 4. Position caret and scroll
+            PositionCaret();
+        }
+
+        private void PositionCaret()
+        {
+            // Calculate caret offset: count through scrollback + visible rows
+            int targetOffset = 0;
+
+            if (!_buffer.IsAlternateBuffer)
+            {
+                // Skip past scrollback lines
+                var scrollback = _buffer.Scrollback;
+                for (int i = 0; i < scrollback.Count; i++)
+                {
+                    var row = scrollback[i];
+                    int lastNonSpace = -1;
+                    for (int c = 0; c < row.Length; c++)
+                    {
+                        if (row[c].Character != ' ' && row[c].Character != '\0')
+                            lastNonSpace = c;
+                    }
+                    targetOffset += lastNonSpace + 1; // chars on this line
+                    targetOffset++; // newline
+                }
+            }
+
+            // Walk through screen rows to the cursor row
+            for (int r = 0; r < _buffer.CursorRow; r++)
+            {
+                int lastNonSpace = -1;
+                for (int c = 0; c < _buffer.Cols; c++)
+                {
+                    char ch = _buffer.GetCell(r, c).Character;
+                    if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                }
+                int renderTo = lastNonSpace;
+                if (r == _buffer.CursorRow)
+                    renderTo = Math.Max(renderTo, _buffer.CursorCol);
+                targetOffset += renderTo + 1; // chars
+                targetOffset++; // newline
+            }
+
+            // Add cursor column
+            targetOffset += _buffer.CursorCol;
+
+            targetOffset = Math.Clamp(targetOffset, 0, Document.TextLength);
+
+            TextArea.Caret.Offset = targetOffset;
+            ScrollToEnd();
+        }
+
+        private static void AddSegment(List<ColorSegment> segments, int offset, int length,
+            TerminalBuffer.CellStyle style)
+        {
+            var fg = style.Foreground;
+            var bg = style.Background;
+
+            // Handle inverse (swap FG and BG)
+            if (style.IsInverse)
+            {
+                (fg, bg) = (bg ?? TerminalBackground, fg ?? TerminalForeground);
+            }
+
+            segments.Add(new ColorSegment
+            {
+                StartOffset = offset,
+                Length = length,
+                Foreground = fg,
+                Background = bg,
+                IsBold = style.IsBold,
+                IsDim = style.IsDim,
+                IsItalic = style.IsItalic,
+                IsUnderline = style.IsUnderline,
+                IsStrikethrough = style.IsStrikethrough,
+            });
+        }
+
+        // ── Param helpers ────────────────────────────────────────────────────
+
+        private static int[] ParseParams(string paramStr)
+        {
+            if (string.IsNullOrEmpty(paramStr))
+                return Array.Empty<int>();
+
+            var parts = paramStr.Split(';');
+            var result = new int[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (!int.TryParse(parts[i], out result[i]))
+                    result[i] = 0;
+            }
+            return result;
+        }
+
+        /// <summary>Get parameter at index, or default if missing.</summary>
+        private static int Param(int[] parms, int index, int defaultValue)
+        {
+            if (index >= parms.Length || parms[index] == 0) return defaultValue;
+            return parms[index];
+        }
 
         // ── Input Handling ──────────────────────────────────────────────────
 
@@ -362,7 +879,7 @@ namespace PowerTerminal.Controls
             {
                 // Hidden mode: accumulate printable chars without echoing them
                 foreach (char ch in e.Text)
-                    if (ch >= ' ') // printable ASCII / Unicode (U+0020 and above)
+                    if (ch >= ' ')
                         _hiddenInputBuffer.Append(ch);
                 e.Handled = true;
                 return;
@@ -454,7 +971,6 @@ namespace PowerTerminal.Controls
                 }
             }
 
-            // (Same key mapping logic as before)
             string? seq = KeyToSequence(e);
             if (seq != null)
             {
@@ -477,7 +993,10 @@ namespace PowerTerminal.Controls
                 }
                 else
                 {
-                    UserInput?.Invoke(text);
+                    if (_buffer.BracketedPasteMode)
+                        UserInput?.Invoke($"\x1b[200~{text}\x1b[201~");
+                    else
+                        UserInput?.Invoke(text);
                 }
             }
         }
@@ -496,159 +1015,17 @@ namespace PowerTerminal.Controls
             cb?.Invoke(string.Empty);
         }
 
-        // ── ANSI Data Structures ─────────────────────────────────────────────
-
-        private void ProcessSgr(string content)
-        {
-            if (string.IsNullOrEmpty(content))
-            {
-                _currentStyle.Reset();
-                return;
-            }
-
-            var parts = content.Split(';');
-            var codes = new List<int>();
-            foreach (var p in parts)
-            {
-                if (int.TryParse(p, out int val)) codes.Add(val);
-                else codes.Add(0); // Handle empty/invalid as 0 (Reset) or ignore? Usually 0.
-            }
-
-            if (codes.Count == 0)
-            {
-                _currentStyle.Reset();
-                return;
-            }
-
-            for (int i = 0; i < codes.Count; i++)
-            {
-                int code = codes[i];
-
-                switch (code)
-                {
-                    case 0: _currentStyle.Reset(); break;
-                    case 1: _currentStyle.IsBold = true; break;
-                    case 22: _currentStyle.IsBold = false; break;
-                    case 39: _currentStyle.Foreground = null; break; // Default FG
-                    case 49: _currentStyle.Background = null; break; // Default BG
-
-                    // Foreground Standard (30-37)
-                    case >= 30 and <= 37:
-                        _currentStyle.Foreground = GetAnsiColor(code - 30, _currentStyle.IsBold);
-                        break;
-                    // Foreground Bright (90-97)
-                    case >= 90 and <= 97:
-                        _currentStyle.Foreground = GetAnsiColor(code - 90 + 8, false);
-                        break;
-
-                    // Background Standard (40-47)
-                    case >= 40 and <= 47:
-                        _currentStyle.Background = GetAnsiColor(code - 40, false); // BG rarely bold
-                        break;
-                    // Background Bright (100-107)
-                    case >= 100 and <= 107:
-                        _currentStyle.Background = GetAnsiColor(code - 100 + 8, false);
-                        break;
-
-                    // Extended Colors (38/48)
-                    case 38: // FG
-                    case 48: // BG
-                        if (i + 1 < codes.Count)
-                        {
-                            int type = codes[i + 1];
-                            if (type == 5 && i + 2 < codes.Count)
-                            {
-                                // 256-color: 38;5;n
-                                int colorIndex = codes[i + 2];
-                                var brush = GetXtermColor(colorIndex);
-                                if (code == 38) _currentStyle.Foreground = brush;
-                                else            _currentStyle.Background = brush;
-                                i += 2; // Skip processed
-                            }
-                            else if (type == 2 && i + 4 < codes.Count)
-                            {
-                                // TrueColor: 38;2;r;g;b
-                                byte r = (byte)codes[i + 2];
-                                byte g = (byte)codes[i + 3];
-                                byte b = (byte)codes[i + 4];
-                                var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
-                                brush.Freeze();
-                                if (code == 38) _currentStyle.Foreground = brush;
-                                else            _currentStyle.Background = brush;
-                                i += 4; // Skip processed
-                            }
-                        }
-                        break;
-                }
-            }
-        }
-
-        private Brush GetAnsiColor(int index, bool isBold)
-        {
-            // Map 0-7 to 8-15 if bold is active (common terminal behavior for FG)
-            if (isBold && index < 8) index += 8;
-            if (index >= 0 && index < AnsiColors.Length) return AnsiColors[index];
-            return AnsiColors[7]; // Fallback
-        }
-
-        private static readonly ConcurrentDictionary<int, Brush> XtermCache = new();
-
-        private static Brush GetXtermColor(int index)
-        {
-            if (index < 0 || index > 255) return AnsiColors[7]; // Fallback
-            if (index < 16) return AnsiColors[index];           // 0-15 Standard
-
-            return XtermCache.GetOrAdd(index, idx =>
-            {
-                Color c;
-                if (idx >= 16 && idx <= 231)
-                {
-                    // 6x6x6 Color Cube
-                    // (val - 16) = (r * 36) + (g * 6) + b
-                    int val = idx - 16;
-                    int b = val % 6; val /= 6;
-                    int g = val % 6; val /= 6;
-                    int r = val;
-
-                    // Mapping 0..5 to 0..255
-                    // 0->0, 1->95, 2->135, 3->175, 4->215, 5->255
-                    byte ByteMap(int v) => (byte)(v == 0 ? 0 : (v * 40 + 55));
-                    c = Color.FromRgb(ByteMap(r), ByteMap(g), ByteMap(b));
-                }
-                else
-                {
-                    // 232-255 Grayscale Ramp
-                    // (val - 232) * 10 + 8
-                    int gray = (idx - 232) * 10 + 8;
-                    c = Color.FromRgb((byte)gray, (byte)gray, (byte)gray);
-                }
-                var brush = new SolidColorBrush(c);
-                brush.Freeze();
-                return brush;
-            });
-        }
-
-        private class TerminalStyle
-        {
-            public Brush? Foreground;
-            public Brush? Background;
-            public bool IsBold;
-
-            public bool IsNonDefault => Foreground != null || Background != null || IsBold;
-
-            public void Reset()
-            {
-                Foreground = null;
-                Background = null;
-                IsBold = false;
-            }
-        }
+        // ── Color data structures ────────────────────────────────────────────
 
         private class ColorSegment : TextSegment
         {
             public Brush? Foreground;
             public Brush? Background;
             public bool IsBold;
+            public bool IsDim;
+            public bool IsItalic;
+            public bool IsUnderline;
+            public bool IsStrikethrough;
         }
 
         private class AnsiColorizer : DocumentColorizingTransformer
@@ -658,11 +1035,6 @@ namespace PowerTerminal.Controls
             public AnsiColorizer(TextSegmentCollection<ColorSegment> segments)
             {
                 _segments = segments;
-            }
-
-            public void Clear()
-            {
-                // Segments must be cleared from the collection
             }
 
             protected override void ColorizeLine(DocumentLine line)
@@ -677,13 +1049,30 @@ namespace PowerTerminal.Controls
                     {
                         ChangeLinePart(start, end, element =>
                         {
-                            if (seg.Foreground != null) element.TextRunProperties.SetForegroundBrush(seg.Foreground);
-                            if (seg.Background != null) element.TextRunProperties.SetBackgroundBrush(seg.Background);
+                            if (seg.Foreground != null)
+                                element.TextRunProperties.SetForegroundBrush(seg.Foreground);
+                            if (seg.Background != null)
+                                element.TextRunProperties.SetBackgroundBrush(seg.Background);
+
+                            var tf = element.TextRunProperties.Typeface;
+
                             if (seg.IsBold)
                             {
-                                var tf = element.TextRunProperties.Typeface;
                                 element.TextRunProperties.SetTypeface(new Typeface(
                                     tf.FontFamily, tf.Style, FontWeights.Bold, tf.Stretch));
+                                tf = element.TextRunProperties.Typeface;
+                            }
+                            if (seg.IsItalic)
+                            {
+                                element.TextRunProperties.SetTypeface(new Typeface(
+                                    tf.FontFamily, FontStyles.Italic, tf.Weight, tf.Stretch));
+                            }
+                            if (seg.IsUnderline || seg.IsStrikethrough)
+                            {
+                                var decorations = new TextDecorationCollection();
+                                if (seg.IsUnderline) decorations.Add(TextDecorations.Underline);
+                                if (seg.IsStrikethrough) decorations.Add(TextDecorations.Strikethrough);
+                                element.TextRunProperties.SetTextDecorations(decorations);
                             }
                         });
                     }
@@ -699,7 +1088,7 @@ namespace PowerTerminal.Controls
             new SolidColorBrush(Color.FromRgb(204, 0, 0)),    // 1 Red
             new SolidColorBrush(Color.FromRgb(78, 154, 6)),   // 2 Green
             new SolidColorBrush(Color.FromRgb(196, 160, 0)),  // 3 Yellow
-            new SolidColorBrush(Color.FromRgb(52, 101, 164)), // 4 Blue (Restored)
+            new SolidColorBrush(Color.FromRgb(52, 101, 164)), // 4 Blue
             new SolidColorBrush(Color.FromRgb(117, 80, 123)), // 5 Magenta
             new SolidColorBrush(Color.FromRgb(6, 152, 154)),  // 6 Cyan
             new SolidColorBrush(Color.FromRgb(211, 215, 207)),// 7 White
@@ -709,27 +1098,71 @@ namespace PowerTerminal.Controls
             new SolidColorBrush(Color.FromRgb(239, 41, 41)),  // 9 Bright Red
             new SolidColorBrush(Color.FromRgb(138, 226, 52)), // 10 Bright Green
             new SolidColorBrush(Color.FromRgb(252, 233, 79)), // 11 Bright Yellow
-            new SolidColorBrush(Color.FromRgb(114, 159, 207)),// 12 Bright Blue (Restored)
+            new SolidColorBrush(Color.FromRgb(114, 159, 207)),// 12 Bright Blue
             new SolidColorBrush(Color.FromRgb(173, 127, 168)),// 13 Bright Magenta
             new SolidColorBrush(Color.FromRgb(52, 226, 226)), // 14 Bright Cyan
             new SolidColorBrush(Color.FromRgb(238, 238, 236)),// 15 Bright White
         };
 
-
-        private static string? KeyToSequence(KeyEventArgs e)
+        private static Brush GetAnsiColor(int index, bool isBold)
         {
-             bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+            if (isBold && index < 8) index += 8;
+            if (index >= 0 && index < AnsiColors.Length) return AnsiColors[index];
+            return AnsiColors[7];
+        }
+
+        private static readonly ConcurrentDictionary<int, Brush> XtermCache = new();
+
+        private static Brush GetXtermColor(int index)
+        {
+            if (index < 0 || index > 255) return AnsiColors[7];
+            if (index < 16) return AnsiColors[index];
+
+            return XtermCache.GetOrAdd(index, idx =>
+            {
+                Color c;
+                if (idx >= 16 && idx <= 231)
+                {
+                    int val = idx - 16;
+                    int b = val % 6; val /= 6;
+                    int g = val % 6; val /= 6;
+                    int r = val;
+                    byte ByteMap(int v) => (byte)(v == 0 ? 0 : (v * 40 + 55));
+                    c = Color.FromRgb(ByteMap(r), ByteMap(g), ByteMap(b));
+                }
+                else
+                {
+                    int gray = (idx - 232) * 10 + 8;
+                    c = Color.FromRgb((byte)gray, (byte)gray, (byte)gray);
+                }
+                var brush = new SolidColorBrush(c);
+                brush.Freeze();
+                return brush;
+            });
+        }
+
+        // ── Key mapping ──────────────────────────────────────────────────────
+
+        private string? KeyToSequence(KeyEventArgs e)
+        {
+            bool ctrl = (e.KeyboardDevice.Modifiers & ModifierKeys.Control) != 0;
+            bool shift = (e.KeyboardDevice.Modifiers & ModifierKeys.Shift) != 0;
+
+            // Application cursor keys mode changes arrow sequences
+            bool appCursor = _buffer.ApplicationCursorKeys;
+
             switch (e.Key)
             {
                 case Key.Enter:     return "\r";
                 case Key.Space:     return " ";
                 case Key.Back:      return "\x7f";
-                case Key.Tab:       return "\t";
+                case Key.Tab:
+                    return shift ? "\x1b[Z" : "\t"; // Shift+Tab → reverse tab
                 case Key.Escape:    return "\x1b";
-                case Key.Up:        return "\x1b[A";
-                case Key.Down:      return "\x1b[B";
-                case Key.Right:     return "\x1b[C";
-                case Key.Left:      return "\x1b[D";
+                case Key.Up:        return appCursor ? "\x1bOA" : "\x1b[A";
+                case Key.Down:      return appCursor ? "\x1bOB" : "\x1b[B";
+                case Key.Right:     return appCursor ? "\x1bOC" : "\x1b[C";
+                case Key.Left:      return appCursor ? "\x1bOD" : "\x1b[D";
                 case Key.Home:      return "\x1b[H";
                 case Key.End:       return "\x1b[F";
                 case Key.Delete:    return "\x1b[3~";
@@ -756,4 +1189,3 @@ namespace PowerTerminal.Controls
         }
     }
 }
-

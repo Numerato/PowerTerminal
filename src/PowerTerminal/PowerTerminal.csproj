@@ -26,6 +26,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="PowerTerminal.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="SSH.NET" Version="2025.1.0" />
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
     <PackageReference Include="Markdig" Version="1.1.1" />
