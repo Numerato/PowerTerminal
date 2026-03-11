@@ -164,6 +164,8 @@ namespace PowerTerminal.Controls
 
         // ── Escape Sequence Parser (character-by-character) ──────────────────
 
+        // Parsing is lightweight (buffer ops, no document mutation until render).
+        // Rendering cost is bounded by terminal dimensions, not input size.
         private const int MaxCharsPerFrame = 50000;
 
         private void ProcessQueue()
@@ -226,7 +228,8 @@ namespace PowerTerminal.Controls
                 {
                     if (i + 1 >= len)
                     {
-                        // Incomplete escape — save for next chunk
+                        // Incomplete escape — save remainder for next chunk.
+                        // Allocation is acceptable: occurs only at network chunk boundaries.
                         _leftoverStr = data.Substring(i);
                         return;
                     }
@@ -1054,18 +1057,13 @@ namespace PowerTerminal.Controls
                             if (seg.Background != null)
                                 element.TextRunProperties.SetBackgroundBrush(seg.Background);
 
-                            var tf = element.TextRunProperties.Typeface;
-
-                            if (seg.IsBold)
+                            if (seg.IsBold || seg.IsItalic)
                             {
+                                var tf = element.TextRunProperties.Typeface;
+                                var weight = seg.IsBold ? FontWeights.Bold : tf.Weight;
+                                var style = seg.IsItalic ? FontStyles.Italic : tf.Style;
                                 element.TextRunProperties.SetTypeface(new Typeface(
-                                    tf.FontFamily, tf.Style, FontWeights.Bold, tf.Stretch));
-                                tf = element.TextRunProperties.Typeface;
-                            }
-                            if (seg.IsItalic)
-                            {
-                                element.TextRunProperties.SetTypeface(new Typeface(
-                                    tf.FontFamily, FontStyles.Italic, tf.Weight, tf.Stretch));
+                                    tf.FontFamily, style, weight, tf.Stretch));
                             }
                             if (seg.IsUnderline || seg.IsStrikethrough)
                             {
