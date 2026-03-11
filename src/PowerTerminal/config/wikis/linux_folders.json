@@ -1,0 +1,131 @@
+{
+  "Id": "11111111-0001-0001-0001-000000000001",
+  "Title": "Managing Folders on Linux",
+  "Description": "How to create, navigate, list, and delete directories on Linux",
+  "Tags": ["linux", "folders", "directories", "filesystem", "basics"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "Linux directory management is done entirely through the command line. Below are the most common commands you will need.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "## List directory contents\nUse 'ls' with various flags to list files and folders.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "ls -la $CurrentDirectory$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Create a new directory\nUse 'mkdir' to create one or more directories. The -p flag creates parent directories as needed.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "mkdir $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "mkdir -p $homefolder$/$variable:DirectoryPath$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Navigate directories\nUse 'cd' to change directory. 'cd ..' goes up one level, 'cd ~' goes to your home folder.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "cd $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "cd $homefolder$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "cd ..",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Copy a directory\nUse 'cp -r' (recursive) to copy a directory and all its contents.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "cp -r $variable:SourceDir$ $variable:DestinationDir$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Move / rename a directory",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "mv $variable:OldName$ $variable:NewName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Delete an empty directory\nUse 'rmdir' for empty directories.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "rmdir $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Delete a directory and all its contents (CAREFUL!)\nUse 'rm -rf' to recursively and forcibly remove a directory. This cannot be undone!",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "rm -rf $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Check disk usage of a directory",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "du -sh $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Change ownership of a directory",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo chown -R $username$:$username$ $variable:DirectoryName$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "## Change permissions of a directory",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo chmod 755 $variable:DirectoryName$",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "linux_folders.json"
+}

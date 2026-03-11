@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+_ReSharper*/
+*.ncrunchproject
+TestResults/
+
+# NuGet packages
+packages/
+*.nupkg
+project.lock.json
+.nuget/
+
+# Runtime / logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp
+*.tmp
+*.swp
+*~
+
+# dotnet tools manifest (optional)
+.config/

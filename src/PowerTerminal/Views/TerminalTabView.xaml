@@ -1,0 +1,18 @@
+<UserControl x:Class="PowerTerminal.Views.TerminalTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctrl="clr-namespace:PowerTerminal.Controls"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="4">
+        <!-- Terminal output fills the entire area; no status bar -->
+        <ctrl:TerminalControl x:Name="Terminal"
+                              VerticalAlignment="Stretch"
+                              HorizontalAlignment="Stretch"
+                              TerminalFontFamily="{Binding Theme.FontFamily}"
+                              TerminalFontSize="{Binding Theme.FontSize}"
+                              Padding="{Binding TerminalPadding}"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled" />
+
+    </Grid>
+</UserControl>

@@ -1,0 +1,213 @@
+<Window x:Class="PowerTerminal.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Height="680" Width="600"
+        MinHeight="440" MinWidth="460"
+        Background="Transparent"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner">
+
+    <Border BorderBrush="#777777"
+            BorderThickness="1"
+            CornerRadius="8"
+            Background="{StaticResource BackgroundBrush}"
+            ClipToBounds="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource TitleBarBrush}"
+                    BorderBrush="#3b3b3c"
+                    BorderThickness="0,0,0,1"
+                    CornerRadius="7,7,0,0">
+            <Grid MouseLeftButtonDown="TitleBar_MouseDown">
+                <TextBlock Text="Settings"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           VerticalAlignment="Center"
+                           Margin="14,0,0,0"/>
+                <Button Style="{StaticResource DialogCloseButton}"
+                        HorizontalAlignment="Right"
+                        Click="Cancel_Click">
+                    <TextBlock Text="&#xE8BB;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="10"/>
+                </Button>
+            </Grid>
+            </Border>
+
+            <!-- Content -->
+            <Grid Grid.Row="1" Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+
+                        <!-- AI Settings -->
+                            <StackPanel >
+                              <TextBlock Text="AI Configuration"
+                                         FontSize="13" FontWeight="SemiBold"
+                                         Foreground="{StaticResource AccentBrush}"
+                                         Margin="0,0,0,8"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Label Content="API Base URL:"/>
+                                    <TextBox Grid.Column="1"
+                                             x:Name="ApiBaseUrl"
+
+                                             ToolTip="OpenAI-compatible endpoint, e.g. https://api.openai.com/v1"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Label Content="API Token:"/>
+                                    <PasswordBox Grid.Column="1" x:Name="ApiToken"
+                                                 PasswordChar="*"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Label Content="Model:"/>
+                                    <TextBox Grid.Column="1" x:Name="ModelName"
+                                             ToolTip="e.g. gpt-4o-mini, gpt-4o, gpt-3.5-turbo"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Label Content="Temperature:"/>
+                                    <Slider Grid.Column="1"
+                                            x:Name="Temperature"
+                                            Minimum="0" Maximum="2"
+                                            SmallChange="0.1" LargeChange="0.5"
+                                            TickFrequency="0.1"
+                                            Foreground="{StaticResource AccentBrush}"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Label Content="System Prompt:"/>
+                                    <TextBox Grid.Column="1"
+                                             x:Name="SystemPrompt"
+                                             AcceptsReturn="True"
+                                             MinHeight="80"
+                                             MaxHeight="120"
+                                             TextWrapping="Wrap"
+                                             VerticalScrollBarVisibility="Auto"/>
+                                </Grid>
+                            </StackPanel>
+
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- SSH Settings -->
+                        <TextBlock Text="SSH Configuration"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Content="SSH Keys Folder:"/>
+                            <TextBox Grid.Column="1" x:Name="SshKeysFolderInput"
+                                     ToolTip="Folder to search for SSH private keys. Default: %USERPROFILE%\.ssh"
+                                     Margin="0,0,4,0"/>
+                            <Button Grid.Column="2" Content="Browse"
+                                    Style="{StaticResource FlatButton}"
+                                    Click="BrowseSshFolder_Click"/>
+                        </Grid>
+
+                        <TextBlock Text="Keys are auto-discovered by host name, known_hosts, and standard filenames (id_ed25519, id_rsa, …)."
+                                   Foreground="{StaticResource ForegroundDimBrush}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Margin="140,0,0,0"/>
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- Theme settings -->
+                        <TextBlock Text="Terminal Appearance"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Content="Font Family:"/>
+                            <TextBox Grid.Column="1" x:Name="FontFamilyInput"
+                                     ToolTip="Cascadia Code, Consolas, Courier New"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Content="Font Size:"/>
+                            <TextBox Grid.Column="1" x:Name="FontSizeInput"/>
+                        </Grid>
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- Debug Logging -->
+                        <TextBlock Text="Debug Settings"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <StackPanel Margin="10">
+                          <CheckBox x:Name="DebugLoggingCheck"
+                                    Content="Enable Debug Logging (Requires Restart)"
+                                    Foreground="{StaticResource ForegroundBrush}"
+                                    Margin="0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,12,0,0">
+                    <Button Content="Save"
+                            Style="{StaticResource AccentButton}"
+                            Click="Save_Click"
+                            Margin="0,0,8,0" MinWidth="80"/>
+                    <Button Content="Cancel"
+                            Style="{StaticResource FlatButton}"
+                            Click="Cancel_Click"
+                            MinWidth="80"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,86 @@
+{
+  "Id": "44444444-0004-0004-0004-000000000004",
+  "Title": "Set a Static IP Address on Linux (Ubuntu/Netplan)",
+  "Description": "Configure a permanent static IP address using Netplan on Ubuntu 18.04+",
+  "Tags": ["network", "ip", "static", "netplan", "ubuntu", "configuration"],
+  "Sections": [
+    {
+      "Type": "Text",
+      "Content": "## Set a Static IP Address using Netplan\nUbuntu 18.04 and later use Netplan for network configuration. The configuration files are YAML files stored in /etc/netplan/.",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 1: Find your network interface name",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "ip link show",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 2: Back up the current Netplan configuration",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo cp /etc/netplan/00-installer-config.yaml /etc/netplan/00-installer-config.yaml.bak",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 3: Edit the Netplan configuration\nReplace the interface name (e.g., eth0, ens18) with yours.\nUse the values from the prompts below.",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo nano /etc/netplan/00-installer-config.yaml",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Netplan YAML content (replace with your values):\n\n```yaml\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    $variable:InterfaceName$:\n      dhcp4: no\n      addresses:\n        - $variable:IPAddress$/$variable:SubnetPrefix$\n      gateway4: $variable:Gateway$\n      nameservers:\n        addresses:\n          - $variable:DNS1$\n          - $variable:DNS2$\n```\n\nExample values:\n- InterfaceName: ens18 or eth0\n- IPAddress: 192.168.1.100\n- SubnetPrefix: 24  (= 255.255.255.0)\n- Gateway: 192.168.1.1\n- DNS1: 8.8.8.8\n- DNS2: 8.8.4.4",
+      "Language": null
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 4: Apply the Netplan configuration",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "sudo netplan apply",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Step 5: Verify the new IP address",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "ip addr show && ip route show",
+      "Language": "bash"
+    },
+    {
+      "Type": "Text",
+      "Content": "### Test connectivity",
+      "Language": null
+    },
+    {
+      "Type": "Command",
+      "Content": "ping -c 4 $variable:Gateway$",
+      "Language": "bash"
+    },
+    {
+      "Type": "Command",
+      "Content": "ping -c 4 8.8.8.8",
+      "Language": "bash"
+    }
+  ],
+  "CreatedAt": "2025-01-01T00:00:00Z",
+  "UpdatedAt": "2025-01-01T00:00:00Z",
+  "FileName": "static_ip.json"
+}
