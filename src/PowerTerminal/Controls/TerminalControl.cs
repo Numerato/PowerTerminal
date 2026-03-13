@@ -336,6 +336,7 @@ namespace PowerTerminal.Controls
             int paramStart = i;
             while (i < len && (char.IsDigit(data[i]) || data[i] == ';'))
                 i++;
+            string paramStr = data.Substring(paramStart, i - paramStart);
 
             // Collect intermediate bytes (0x20-0x2F: space through /)
             string intermediate = "";
@@ -353,12 +354,6 @@ namespace PowerTerminal.Controls
             }
 
             char finalChar = data[i];
-            string paramStr = data.Substring(paramStart, paramStart <= i ? (i - intermediate.Length - paramStart) : 0);
-            // Re-calculate paramStr properly
-            int paramEnd = paramStart;
-            while (paramEnd < len && (char.IsDigit(data[paramEnd]) || data[paramEnd] == ';'))
-                paramEnd++;
-            paramStr = data.Substring(paramStart, paramEnd - paramStart);
 
             if (prefix.Length > 0)
                 ProcessCsiPrivate(prefix, paramStr, finalChar, intermediate);

@@ -221,24 +221,18 @@ namespace PowerTerminal.Controls
             _wrapPending = false;
             if (_tabStops != null && _tabStops.Count > 0)
             {
-                // Use custom tab stops
+                // Use custom tab stops — find the smallest stop > _cursorCol
                 int next = _cols - 1;
-                foreach (int stop in _tabStops)
-                {
-                    if (stop > _cursorCol && stop < next)
-                        next = stop;
-                }
-                // If no custom stop found after cursor, find smallest stop >= cols
                 bool found = false;
                 foreach (int stop in _tabStops)
                 {
-                    if (stop > _cursorCol)
+                    if (stop > _cursorCol && (!found || stop < next))
                     {
-                        if (!found || stop < next) next = stop;
+                        next = stop;
                         found = true;
                     }
                 }
-                _cursorCol = found ? Math.Min(next, _cols - 1) : _cols - 1;
+                _cursorCol = Math.Min(next, _cols - 1);
             }
             else
             {
