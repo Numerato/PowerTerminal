@@ -22,21 +22,28 @@ namespace PowerTerminal.Controls
             public bool IsUnderline;
             public bool IsInverse;
             public bool IsStrikethrough;
+            public bool IsBlink;
+            public bool IsHidden;
+            public Brush UnderlineColor;
 
             public bool IsNonDefault =>
-                Foreground != null || Background != null ||
-                IsBold || IsDim || IsItalic || IsUnderline || IsInverse || IsStrikethrough;
+                Foreground != null || Background != null || UnderlineColor != null ||
+                IsBold || IsDim || IsItalic || IsUnderline || IsInverse ||
+                IsStrikethrough || IsBlink || IsHidden;
 
             public void Reset()
             {
                 Foreground = null;
                 Background = null;
+                UnderlineColor = null;
                 IsBold = false;
                 IsDim = false;
                 IsItalic = false;
                 IsUnderline = false;
                 IsInverse = false;
                 IsStrikethrough = false;
+                IsBlink = false;
+                IsHidden = false;
             }
         }
 
@@ -85,6 +92,27 @@ namespace PowerTerminal.Controls
         public bool CursorVisible { get; set; } = true;
         public bool ApplicationCursorKeys { get; set; }
         public bool BracketedPasteMode { get; set; }
+        public bool OriginMode { get; set; }
+        public bool InsertMode { get; set; }
+        public bool FocusReporting { get; set; }
+        public bool SynchronizedOutput { get; set; }
+
+        /// <summary>Mouse tracking mode. 0=off, 9=X10, 1000=normal, 1002=button, 1003=any.</summary>
+        public int MouseMode { get; set; }
+        /// <summary>Mouse encoding format. 0=normal (X10), 1006=SGR, 1015=URXVT.</summary>
+        public int MouseEncoding { get; set; }
+
+        /// <summary>Cursor shape: 0=default(block blink), 1=block blink, 2=block steady, 3=underline blink, 4=underline steady, 5=bar blink, 6=bar steady.</summary>
+        public int CursorShape { get; set; }
+
+        // Custom tab stops (null means use default 8-column stops)
+        private HashSet<int>? _tabStops;
+
+        // Last written character for REP (CSI b)
+        internal char LastWrittenChar { get; private set; }
+
+        // Saved DEC private modes for CSI ? … s / CSI ? … r
+        private readonly Dictionary<int, bool> _savedDecModes = new();
 
         // Track if the cursor wrapped and is pending on the next column
         private bool _wrapPending;
@@ -131,12 +159,20 @@ namespace PowerTerminal.Controls
             if (_cursorCol >= _cols)
                 _cursorCol = _cols - 1;
 
+            // Insert mode: shift characters right before writing
+            if (InsertMode)
+            {
+                for (int col = _cols - 1; col > _cursorCol; col--)
+                    _cells[_cursorRow, col] = _cells[_cursorRow, col - 1];
+            }
+
             _cells[_cursorRow, _cursorCol] = new Cell
             {
                 Character = c,
                 Style = CurrentStyle
             };
 
+            LastWrittenChar = c;
             _cursorCol++;
             if (_cursorCol >= _cols)
             {
@@ -179,13 +215,61 @@ namespace PowerTerminal.Controls
             IsDirty = true;
         }
 
-        /// <summary>Horizontal Tab — advance to next tab stop (every 8 columns).</summary>
+        /// <summary>Horizontal Tab — advance to next tab stop.</summary>
         public void Tab()
         {
             _wrapPending = false;
-            int next = ((_cursorCol / 8) + 1) * 8;
-            _cursorCol = Math.Min(next, _cols - 1);
+            if (_tabStops != null && _tabStops.Count > 0)
+            {
+                // Use custom tab stops
+                int next = _cols - 1;
+                foreach (int stop in _tabStops)
+                {
+                    if (stop > _cursorCol && stop < next)
+                        next = stop;
+                }
+                // If no custom stop found after cursor, find smallest stop >= cols
+                bool found = false;
+                foreach (int stop in _tabStops)
+                {
+                    if (stop > _cursorCol)
+                    {
+                        if (!found || stop < next) next = stop;
+                        found = true;
+                    }
+                }
+                _cursorCol = found ? Math.Min(next, _cols - 1) : _cols - 1;
+            }
+            else
+            {
+                // Default 8-column stops
+                int next = ((_cursorCol / 8) + 1) * 8;
+                _cursorCol = Math.Min(next, _cols - 1);
+            }
             IsDirty = true;
+        }
+
+        /// <summary>HTS (ESC H) — set a tab stop at the current cursor column.</summary>
+        public void SetTabStop()
+        {
+            _tabStops ??= new HashSet<int>();
+            // Seed default stops on first custom set
+            if (_tabStops.Count == 0)
+                for (int c = 8; c < _cols; c += 8)
+                    _tabStops.Add(c);
+            _tabStops.Add(_cursorCol);
+        }
+
+        /// <summary>TBC (CSI 0 g) — clear the tab stop at the current column.</summary>
+        public void ClearTabStop()
+        {
+            _tabStops?.Remove(_cursorCol);
+        }
+
+        /// <summary>TBC (CSI 3 g) — clear all tab stops.</summary>
+        public void ClearAllTabStops()
+        {
+            _tabStops?.Clear();
         }
 
         /// <summary>Bell — no-op for visual terminal.</summary>
@@ -193,11 +277,20 @@ namespace PowerTerminal.Controls
 
         // ── Cursor movement ──────────────────────────────────────────────────
 
-        /// <summary>CUP / HVP — set cursor position (0-based row, col).</summary>
+        /// <summary>CUP / HVP — set cursor position (0-based row, col). Respects origin mode.</summary>
         public void SetCursorPosition(int row, int col)
         {
             _wrapPending = false;
-            _cursorRow = Math.Clamp(row, 0, _rows - 1);
+            if (OriginMode)
+            {
+                // In origin mode, row 0 is _scrollTop
+                row += _scrollTop;
+                _cursorRow = Math.Clamp(row, _scrollTop, _scrollBottom);
+            }
+            else
+            {
+                _cursorRow = Math.Clamp(row, 0, _rows - 1);
+            }
             _cursorCol = Math.Clamp(col, 0, _cols - 1);
             IsDirty = true;
         }
@@ -545,10 +638,91 @@ namespace PowerTerminal.Controls
             CursorVisible = true;
             ApplicationCursorKeys = false;
             BracketedPasteMode = false;
+            OriginMode = false;
+            InsertMode = false;
+            FocusReporting = false;
+            SynchronizedOutput = false;
+            MouseMode = 0;
+            MouseEncoding = 0;
+            CursorShape = 0;
+            _tabStops = null;
+            LastWrittenChar = '\0';
+            _savedDecModes.Clear();
             ClearRegion(0, _rows - 1, 0, _cols - 1);
             _scrollback.Clear();
             if (_isAltBuffer) SwitchToNormalBuffer();
             IsDirty = true;
+        }
+
+        /// <summary>DECSTR (CSI ! p) — soft reset. Resets modes but keeps screen content.</summary>
+        public void SoftReset()
+        {
+            _cursorRow = 0;
+            _cursorCol = 0;
+            _scrollTop = 0;
+            _scrollBottom = _rows - 1;
+            _wrapPending = false;
+            CurrentStyle.Reset();
+            AutoWrap = true;
+            CursorVisible = true;
+            ApplicationCursorKeys = false;
+            BracketedPasteMode = false;
+            OriginMode = false;
+            InsertMode = false;
+            MouseMode = 0;
+            MouseEncoding = 0;
+            CursorShape = 0;
+            _tabStops = null;
+            LastWrittenChar = '\0';
+            IsDirty = true;
+        }
+
+        /// <summary>REP (CSI b) — repeat the last written character n times.</summary>
+        public void RepeatLastChar(int n)
+        {
+            if (LastWrittenChar == '\0') return;
+            for (int i = 0; i < n; i++)
+                WriteChar(LastWrittenChar);
+        }
+
+        /// <summary>DECALN (ESC # 8) — fill entire screen with 'E' characters for alignment test.</summary>
+        public void FillWithE()
+        {
+            CurrentStyle.Reset();
+            for (int r = 0; r < _rows; r++)
+                for (int c = 0; c < _cols; c++)
+                    _cells[r, c] = new Cell { Character = 'E' };
+            _cursorRow = 0;
+            _cursorCol = 0;
+            _wrapPending = false;
+            IsDirty = true;
+        }
+
+        /// <summary>Save a DEC private mode value for later restore.</summary>
+        public void SaveDecMode(int mode, bool value)
+        {
+            _savedDecModes[mode] = value;
+        }
+
+        /// <summary>Restore a previously saved DEC private mode value. Returns null if not saved.</summary>
+        public bool? RestoreDecMode(int mode)
+        {
+            return _savedDecModes.TryGetValue(mode, out var val) ? val : null;
+        }
+
+        /// <summary>Get the current value of a DEC private mode by number.</summary>
+        public bool GetDecMode(int mode)
+        {
+            return mode switch
+            {
+                1 => ApplicationCursorKeys,
+                6 => OriginMode,
+                7 => AutoWrap,
+                25 => CursorVisible,
+                1004 => FocusReporting,
+                2004 => BracketedPasteMode,
+                _ => false
+            };
         }
 
         // ── Internal helpers ─────────────────────────────────────────────────

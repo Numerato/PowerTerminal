@@ -243,6 +243,27 @@ namespace PowerTerminal.ViewModels
             _ssh?.Resize(cols, rows);
         }
 
+        /// <summary>
+        /// Called when an OSC sequence sets the window title.
+        /// Updates the tab header to reflect the title from the remote shell.
+        /// </summary>
+        public void SetTitle(string title)
+        {
+            if (!string.IsNullOrWhiteSpace(title))
+                Header = title;
+        }
+
+        /// <summary>
+        /// Called when a BEL character is received.
+        /// Could be extended to flash the tab header or play a sound.
+        /// </summary>
+        public void OnBell()
+        {
+            // Visual bell: briefly indicate activity (could flash tab header)
+            // For now, use system beep if available
+            try { System.Media.SystemSounds.Beep.Play(); } catch { }
+        }
+
         public async Task RefreshMachineInfoAsync()
         {
             if (_ssh != null && IsConnected)

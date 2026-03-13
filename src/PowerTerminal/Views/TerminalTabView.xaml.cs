@@ -18,6 +18,9 @@ namespace PowerTerminal.Views
         private TerminalTabViewModel? _vm;
         // Stored so the same delegate can be unsubscribed when the VM changes
         private Action<string>? _userInputHandler;
+        private Action<uint, uint>? _resizeHandler;
+        private Action<string>? _titleChangedHandler;
+        private Action? _bellHandler;
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
@@ -33,6 +36,21 @@ namespace PowerTerminal.Views
                     Terminal.UserInput -= _userInputHandler;
                     _userInputHandler   = null;
                 }
+                if (_resizeHandler != null)
+                {
+                    Terminal.TerminalResized -= _resizeHandler;
+                    _resizeHandler = null;
+                }
+                if (_titleChangedHandler != null)
+                {
+                    Terminal.TitleChanged -= _titleChangedHandler;
+                    _titleChangedHandler = null;
+                }
+                if (_bellHandler != null)
+                {
+                    Terminal.BellRung -= _bellHandler;
+                    _bellHandler = null;
+                }
 
                 // Cancel any pending password prompt — unblocks the SSH background thread
                 Terminal.CancelHiddenInput();
@@ -47,6 +65,18 @@ namespace PowerTerminal.Views
 
                 _userInputHandler = s => _vm.SendData(s);
                 Terminal.UserInput += _userInputHandler;
+
+                // Wire terminal resize to SSH PTY resize
+                _resizeHandler = (cols, rows) => _vm.Resize(cols, rows);
+                Terminal.TerminalResized += _resizeHandler;
+
+                // Wire OSC window title to tab header
+                _titleChangedHandler = title => _vm.SetTitle(title);
+                Terminal.TitleChanged += _titleChangedHandler;
+
+                // Wire bell event
+                _bellHandler = () => _vm.OnBell();
+                Terminal.BellRung += _bellHandler;
 
                 // Inline password collection: blocks the SSH background thread via MRE
                 // until the user types a password and presses Enter in this terminal.

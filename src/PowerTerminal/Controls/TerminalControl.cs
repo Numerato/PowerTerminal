@@ -55,15 +55,27 @@ namespace PowerTerminal.Controls
         private readonly AnsiColorizer _colorizer;
 
         public event Action<string>? UserInput;
+        /// <summary>Raised when an OSC sequence sets the window title (OSC 0/1/2).</summary>
+        public event Action<string>? TitleChanged;
+        /// <summary>Raised when the terminal buffer dimensions change due to control resize.</summary>
+        public event Action<uint, uint>? TerminalResized;
+        /// <summary>Raised when the terminal wants a visual bell (e.g. flash the tab header).</summary>
+        public event Action? BellRung;
 
         // Queue for background appending to avoid UI freeze
         private readonly ConcurrentQueue<string> _incomingDataQueue = new();
         private string _leftoverStr = "";
         private int _isRendering;
 
+        // Resize tracking
+        private double _charWidth;
+        private double _charHeight;
+        private bool _charSizeMeasured;
+
         private static readonly SolidColorBrush TerminalForeground = new(Color.FromRgb(204, 204, 204));
         private static readonly SolidColorBrush TerminalBackground = new(Color.FromRgb(12, 12, 12));
         private static readonly SolidColorBrush TerminalCaret      = new(Color.FromRgb(204, 204, 204));
+        private static readonly SolidColorBrush TerminalCaretHidden = new(Color.FromArgb(0, 0, 0, 0));
         private static readonly SolidColorBrush TerminalSelection  = new(Color.FromArgb(120, 92, 40, 0));
 
         static TerminalControl()
@@ -71,6 +83,7 @@ namespace PowerTerminal.Controls
             TerminalForeground.Freeze();
             TerminalBackground.Freeze();
             TerminalCaret.Freeze();
+            TerminalCaretHidden.Freeze();
             TerminalSelection.Freeze();
             foreach (var b in AnsiColors) b.Freeze();
         }
@@ -105,6 +118,19 @@ namespace PowerTerminal.Controls
             PreviewTextInput += OnPreviewTextInput;
 
             Loaded += (_, _) => ApplyTerminalColors();
+
+            // Dynamic resize: recalculate terminal dimensions when control size changes
+            SizeChanged += OnSizeChanged;
+
+            // Focus reporting for ?1004
+            GotFocus += (_, _) => { if (_buffer.FocusReporting) UserInput?.Invoke("\x1b[I"); };
+            LostFocus += (_, _) => { if (_buffer.FocusReporting) UserInput?.Invoke("\x1b[O"); };
+
+            // Mouse events for terminal mouse reporting
+            PreviewMouseDown += OnPreviewMouseDown;
+            PreviewMouseUp += OnPreviewMouseUp;
+            PreviewMouseMove += OnPreviewMouseMove;
+            PreviewMouseWheel += OnPreviewMouseWheel;
 
             // Default focus
             Focusable = true;
@@ -251,6 +277,20 @@ namespace PowerTerminal.Controls
                         // Character set designation — skip (ESC ( X or ESC ) X)
                         i = i + 2 < len ? i + 3 : len;
                     }
+                    else if (next == '#')
+                    {
+                        // ESC # sequences (e.g. DECALN)
+                        if (i + 2 < len)
+                        {
+                            ProcessEscHash(data[i + 2]);
+                            i += 3;
+                        }
+                        else
+                        {
+                            _leftoverStr = data.Substring(i);
+                            return;
+                        }
+                    }
                     else
                     {
                         // Single-character ESC sequences
@@ -297,6 +337,14 @@ namespace PowerTerminal.Controls
             while (i < len && (char.IsDigit(data[i]) || data[i] == ';'))
                 i++;
 
+            // Collect intermediate bytes (0x20-0x2F: space through /)
+            string intermediate = "";
+            while (i < len && data[i] >= 0x20 && data[i] <= 0x2F)
+            {
+                intermediate += data[i];
+                i++;
+            }
+
             if (i >= len)
             {
                 // Incomplete CSI sequence — save for next chunk
@@ -305,10 +353,17 @@ namespace PowerTerminal.Controls
             }
 
             char finalChar = data[i];
-            string paramStr = data.Substring(paramStart, i - paramStart);
+            string paramStr = data.Substring(paramStart, paramStart <= i ? (i - intermediate.Length - paramStart) : 0);
+            // Re-calculate paramStr properly
+            int paramEnd = paramStart;
+            while (paramEnd < len && (char.IsDigit(data[paramEnd]) || data[paramEnd] == ';'))
+                paramEnd++;
+            paramStr = data.Substring(paramStart, paramEnd - paramStart);
 
             if (prefix.Length > 0)
-                ProcessCsiPrivate(prefix, paramStr, finalChar);
+                ProcessCsiPrivate(prefix, paramStr, finalChar, intermediate);
+            else if (intermediate.Length > 0)
+                ProcessCsiIntermediate(paramStr, intermediate, finalChar);
             else
                 ProcessCsiSequence(paramStr, finalChar);
 
@@ -322,18 +377,60 @@ namespace PowerTerminal.Controls
             int len = data.Length;
 
             // Find terminator: BEL (\x07) or ST (ESC \)
+            int payloadStart = start;
+            int payloadEnd = -1;
             while (i < len)
             {
                 if (data[i] == '\x07')
+                {
+                    payloadEnd = i;
+                    ProcessOscPayload(data.Substring(payloadStart, payloadEnd - payloadStart));
                     return i + 1; // skip BEL
+                }
                 if (data[i] == '\x1b' && i + 1 < len && data[i + 1] == '\\')
+                {
+                    payloadEnd = i;
+                    ProcessOscPayload(data.Substring(payloadStart, payloadEnd - payloadStart));
                     return i + 2; // skip ST
+                }
                 i++;
             }
 
             // Incomplete OSC — save for next chunk
             _leftoverStr = data.Substring(start - 2);
             return len;
+        }
+
+        /// <summary>Process the content of an OSC sequence (after ESC] and before terminator).</summary>
+        private void ProcessOscPayload(string payload)
+        {
+            // OSC format: "code;data" or just "code"
+            int semi = payload.IndexOf(';');
+            if (semi < 0) return;
+
+            if (!int.TryParse(payload.Substring(0, semi), out int code)) return;
+            string oscData = payload.Substring(semi + 1);
+
+            switch (code)
+            {
+                case 0: // Set window title + icon name
+                case 1: // Set icon name
+                case 2: // Set window title
+                    TitleChanged?.Invoke(oscData);
+                    break;
+                case 10: // Query/set foreground color
+                    if (oscData == "?")
+                        UserInput?.Invoke("\x1b]10;rgb:cccc/cccc/cccc\x1b\\");
+                    break;
+                case 11: // Query/set background color
+                    if (oscData == "?")
+                        UserInput?.Invoke("\x1b]11;rgb:0c0c/0c0c/0c0c\x1b\\");
+                    break;
+                case 12: // Query/set cursor color
+                    if (oscData == "?")
+                        UserInput?.Invoke("\x1b]12;rgb:cccc/cccc/cccc\x1b\\");
+                    break;
+            }
         }
 
         /// <summary>Handle single-character ESC sequences (ESC X).</summary>
@@ -360,10 +457,22 @@ namespace PowerTerminal.Controls
                 case 'c': // RIS — Full Reset
                     _buffer.FullReset();
                     break;
-                case 'H': // HTS — Set Tab Stop (ignored)
+                case 'H': // HTS — Set Tab Stop at current column
+                    _buffer.SetTabStop();
                     break;
                 case '=': // DECKPAM — Application Keypad Mode (ignored)
                 case '>': // DECKPNM — Numeric Keypad Mode (ignored)
+                    break;
+            }
+        }
+
+        /// <summary>Handle ESC # sequences.</summary>
+        private void ProcessEscHash(char c)
+        {
+            switch (c)
+            {
+                case '8': // DECALN — Screen Alignment Pattern (fill with E)
+                    _buffer.FillWithE();
                     break;
             }
         }
@@ -389,6 +498,7 @@ namespace PowerTerminal.Controls
                     break;
                 case '\x07': // BEL
                     _buffer.Bell();
+                    BellRung?.Invoke();
                     break;
                 // Other control characters are ignored
             }
@@ -487,13 +597,32 @@ namespace PowerTerminal.Controls
                     UserInput?.Invoke("\x1b[?1;2c"); // VT100 with advanced video
                     break;
                 case 'b': // REP — Repeat preceding character
-                    // Ignored for simplicity
+                    _buffer.RepeatLastChar(Math.Max(1, Param(parms, 0, 1)));
+                    break;
+                case 'g': // TBC — Tab Clear
+                    {
+                        int mode = Param(parms, 0, 0);
+                        if (mode == 0) _buffer.ClearTabStop();
+                        else if (mode == 3) _buffer.ClearAllTabStops();
+                    }
+                    break;
+                case 'h': // SM — Set Mode (standard, not DEC private)
+                    for (int j = 0; j < parms.Length; j++)
+                    {
+                        if (parms[j] == 4) _buffer.InsertMode = true;
+                    }
+                    break;
+                case 'l': // RM — Reset Mode (standard, not DEC private)
+                    for (int j = 0; j < parms.Length; j++)
+                    {
+                        if (parms[j] == 4) _buffer.InsertMode = false;
+                    }
                     break;
             }
         }
 
         /// <summary>Dispatch CSI sequences with a private prefix (?, >, !).</summary>
-        private void ProcessCsiPrivate(string prefix, string paramStr, char finalChar)
+        private void ProcessCsiPrivate(string prefix, string paramStr, char finalChar, string intermediate = "")
         {
             int[] parms = ParseParams(paramStr);
 
@@ -507,9 +636,60 @@ namespace PowerTerminal.Controls
                     case 'l': // DECRST
                         for (int j = 0; j < parms.Length; j++) DecReset(parms[j]);
                         break;
+                    case 's': // Save DEC private modes
+                        for (int j = 0; j < parms.Length; j++)
+                            _buffer.SaveDecMode(parms[j], _buffer.GetDecMode(parms[j]));
+                        break;
+                    case 'r': // Restore DEC private modes
+                        for (int j = 0; j < parms.Length; j++)
+                        {
+                            var saved = _buffer.RestoreDecMode(parms[j]);
+                            if (saved.HasValue)
+                            {
+                                if (saved.Value) DecSet(parms[j]);
+                                else DecReset(parms[j]);
+                            }
+                        }
+                        break;
                 }
             }
-            // Other private prefixes (>, !) are ignored
+            else if (prefix == ">")
+            {
+                // Secondary DA (CSI > c) — report terminal type/version
+                if (finalChar == 'c')
+                    UserInput?.Invoke("\x1b[>0;0;0c"); // Generic VT100 compatible
+            }
+            else if (prefix == "!")
+            {
+                // DECSTR — Soft Reset (CSI ! p)
+                if (finalChar == 'p')
+                    _buffer.SoftReset();
+            }
+        }
+
+        /// <summary>Dispatch CSI sequences with intermediate bytes (e.g., CSI n SP q).</summary>
+        private void ProcessCsiIntermediate(string paramStr, string intermediate, char finalChar)
+        {
+            int[] parms = ParseParams(paramStr);
+
+            if (intermediate == " " && finalChar == 'q')
+            {
+                // DECSCUSR — Set Cursor Shape
+                _buffer.CursorShape = Param(parms, 0, 0);
+            }
+            else if (intermediate == "$")
+            {
+                // Selective erase sequences
+                switch (finalChar)
+                {
+                    case 'J': // DECSED — Selective Erase in Display
+                        _buffer.EraseDisplay(Param(parms, 0, 0));
+                        break;
+                    case 'K': // DECSEL — Selective Erase in Line
+                        _buffer.EraseLine(Param(parms, 0, 0));
+                        break;
+                }
+            }
         }
 
         /// <summary>DECSET — enable private mode.</summary>
@@ -520,8 +700,15 @@ namespace PowerTerminal.Controls
                 case 1: // Application Cursor Keys
                     _buffer.ApplicationCursorKeys = true;
                     break;
+                case 6: // Origin Mode (DECOM)
+                    _buffer.OriginMode = true;
+                    _buffer.SetCursorPosition(0, 0);
+                    break;
                 case 7: // Auto-wrap
                     _buffer.AutoWrap = true;
+                    break;
+                case 9: // X10 mouse reporting
+                    _buffer.MouseMode = 9;
                     break;
                 case 12: // Start blinking cursor (ignored)
                     break;
@@ -530,6 +717,24 @@ namespace PowerTerminal.Controls
                     break;
                 case 47: // Use Alternate Screen Buffer (old)
                     _buffer.SwitchToAlternateBuffer();
+                    break;
+                case 1000: // Normal mouse tracking
+                    _buffer.MouseMode = 1000;
+                    break;
+                case 1002: // Button-event mouse tracking
+                    _buffer.MouseMode = 1002;
+                    break;
+                case 1003: // Any-event mouse tracking
+                    _buffer.MouseMode = 1003;
+                    break;
+                case 1004: // Focus reporting
+                    _buffer.FocusReporting = true;
+                    break;
+                case 1006: // SGR mouse encoding
+                    _buffer.MouseEncoding = 1006;
+                    break;
+                case 1015: // URXVT mouse encoding
+                    _buffer.MouseEncoding = 1015;
                     break;
                 case 1047: // Use Alternate Screen Buffer
                     _buffer.SwitchToAlternateBuffer();
@@ -544,6 +749,9 @@ namespace PowerTerminal.Controls
                 case 2004: // Enable Bracketed Paste Mode
                     _buffer.BracketedPasteMode = true;
                     break;
+                case 2026: // Synchronized output
+                    _buffer.SynchronizedOutput = true;
+                    break;
             }
         }
 
@@ -555,8 +763,15 @@ namespace PowerTerminal.Controls
                 case 1: // Normal Cursor Keys
                     _buffer.ApplicationCursorKeys = false;
                     break;
+                case 6: // Origin Mode off
+                    _buffer.OriginMode = false;
+                    _buffer.SetCursorPosition(0, 0);
+                    break;
                 case 7: // No auto-wrap
                     _buffer.AutoWrap = false;
+                    break;
+                case 9: // X10 mouse reporting off
+                    if (_buffer.MouseMode == 9) _buffer.MouseMode = 0;
                     break;
                 case 12: // Stop blinking cursor (ignored)
                     break;
@@ -565,6 +780,24 @@ namespace PowerTerminal.Controls
                     break;
                 case 47: // Use Normal Screen Buffer (old)
                     _buffer.SwitchToNormalBuffer();
+                    break;
+                case 1000: // Normal mouse tracking off
+                    if (_buffer.MouseMode == 1000) _buffer.MouseMode = 0;
+                    break;
+                case 1002: // Button-event mouse tracking off
+                    if (_buffer.MouseMode == 1002) _buffer.MouseMode = 0;
+                    break;
+                case 1003: // Any-event mouse tracking off
+                    if (_buffer.MouseMode == 1003) _buffer.MouseMode = 0;
+                    break;
+                case 1004: // Focus reporting off
+                    _buffer.FocusReporting = false;
+                    break;
+                case 1006: // SGR mouse encoding off
+                    if (_buffer.MouseEncoding == 1006) _buffer.MouseEncoding = 0;
+                    break;
+                case 1015: // URXVT mouse encoding off
+                    if (_buffer.MouseEncoding == 1015) _buffer.MouseEncoding = 0;
                     break;
                 case 1047: // Use Normal Screen Buffer
                     _buffer.SwitchToNormalBuffer();
@@ -578,6 +811,9 @@ namespace PowerTerminal.Controls
                     break;
                 case 2004: // Disable Bracketed Paste Mode
                     _buffer.BracketedPasteMode = false;
+                    break;
+                case 2026: // Synchronized output off — flush pending render
+                    _buffer.SynchronizedOutput = false;
                     break;
             }
         }
@@ -603,16 +839,22 @@ namespace PowerTerminal.Controls
                     case 2: _buffer.CurrentStyle.IsDim = true; break;
                     case 3: _buffer.CurrentStyle.IsItalic = true; break;
                     case 4: _buffer.CurrentStyle.IsUnderline = true; break;
+                    case 5: _buffer.CurrentStyle.IsBlink = true; break;  // Slow blink
+                    case 6: _buffer.CurrentStyle.IsBlink = true; break;  // Rapid blink (same treatment)
                     case 7: _buffer.CurrentStyle.IsInverse = true; break;
+                    case 8: _buffer.CurrentStyle.IsHidden = true; break;
                     case 9: _buffer.CurrentStyle.IsStrikethrough = true; break;
                     case 21: _buffer.CurrentStyle.IsUnderline = true; break; // Double underline → underline
                     case 22: _buffer.CurrentStyle.IsBold = false; _buffer.CurrentStyle.IsDim = false; break;
                     case 23: _buffer.CurrentStyle.IsItalic = false; break;
                     case 24: _buffer.CurrentStyle.IsUnderline = false; break;
+                    case 25: _buffer.CurrentStyle.IsBlink = false; break;
                     case 27: _buffer.CurrentStyle.IsInverse = false; break;
+                    case 28: _buffer.CurrentStyle.IsHidden = false; break;
                     case 29: _buffer.CurrentStyle.IsStrikethrough = false; break;
                     case 39: _buffer.CurrentStyle.Foreground = null; break; // Default FG
                     case 49: _buffer.CurrentStyle.Background = null; break; // Default BG
+                    case 59: _buffer.CurrentStyle.UnderlineColor = null; break; // Default underline color
 
                     // Foreground Standard (30-37)
                     case >= 30 and <= 37:
@@ -657,6 +899,29 @@ namespace PowerTerminal.Controls
                                 brush.Freeze();
                                 if (code == 38) _buffer.CurrentStyle.Foreground = brush;
                                 else            _buffer.CurrentStyle.Background = brush;
+                                i += 4;
+                            }
+                        }
+                        break;
+
+                    // Underline Color (58)
+                    case 58:
+                        if (i + 1 < codes.Length)
+                        {
+                            int type = codes[i + 1];
+                            if (type == 5 && i + 2 < codes.Length)
+                            {
+                                _buffer.CurrentStyle.UnderlineColor = GetXtermColor(codes[i + 2]);
+                                i += 2;
+                            }
+                            else if (type == 2 && i + 4 < codes.Length)
+                            {
+                                byte r = (byte)Math.Clamp(codes[i + 2], 0, 255);
+                                byte g = (byte)Math.Clamp(codes[i + 3], 0, 255);
+                                byte b = (byte)Math.Clamp(codes[i + 4], 0, 255);
+                                var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+                                brush.Freeze();
+                                _buffer.CurrentStyle.UnderlineColor = brush;
                                 i += 4;
                             }
                         }
@@ -821,6 +1086,10 @@ namespace PowerTerminal.Controls
             targetOffset = Math.Clamp(targetOffset, 0, Document.TextLength);
 
             TextArea.Caret.Offset = targetOffset;
+
+            // Cursor visibility: hide/show caret based on buffer flag
+            TextArea.Caret.CaretBrush = _buffer.CursorVisible ? TerminalCaret : TerminalCaretHidden;
+
             ScrollToEnd();
         }
 
@@ -836,17 +1105,26 @@ namespace PowerTerminal.Controls
                 (fg, bg) = (bg ?? TerminalBackground, fg ?? TerminalForeground);
             }
 
+            // Handle hidden text: set foreground = background
+            if (style.IsHidden)
+            {
+                fg = bg ?? TerminalBackground;
+            }
+
             segments.Add(new ColorSegment
             {
                 StartOffset = offset,
                 Length = length,
                 Foreground = fg,
                 Background = bg,
-                IsBold = style.IsBold,
+                IsBold = style.IsBold || style.IsBlink, // Map blink to bold for visual effect
                 IsDim = style.IsDim,
                 IsItalic = style.IsItalic,
                 IsUnderline = style.IsUnderline,
                 IsStrikethrough = style.IsStrikethrough,
+                IsBlink = style.IsBlink,
+                IsHidden = style.IsHidden,
+                UnderlineColor = style.UnderlineColor,
             });
         }
 
@@ -1029,6 +1307,9 @@ namespace PowerTerminal.Controls
             public bool IsItalic;
             public bool IsUnderline;
             public bool IsStrikethrough;
+            public bool IsBlink;
+            public bool IsHidden;
+            public Brush? UnderlineColor;
         }
 
         private class AnsiColorizer : DocumentColorizingTransformer
@@ -1068,7 +1349,19 @@ namespace PowerTerminal.Controls
                             if (seg.IsUnderline || seg.IsStrikethrough)
                             {
                                 var decorations = new TextDecorationCollection();
-                                if (seg.IsUnderline) decorations.Add(TextDecorations.Underline);
+                                if (seg.IsUnderline)
+                                {
+                                    if (seg.UnderlineColor != null)
+                                    {
+                                        var pen = new Pen(seg.UnderlineColor, 1);
+                                        pen.Freeze();
+                                        decorations.Add(new TextDecoration(TextDecorationLocation.Underline, pen, 0, TextDecorationUnit.FontRecommended, TextDecorationUnit.FontRecommended));
+                                    }
+                                    else
+                                    {
+                                        decorations.Add(TextDecorations.Underline);
+                                    }
+                                }
                                 if (seg.IsStrikethrough) decorations.Add(TextDecorations.Strikethrough);
                                 element.TextRunProperties.SetTextDecorations(decorations);
                             }
@@ -1184,6 +1477,160 @@ namespace PowerTerminal.Controls
                         return ((char)(e.Key - Key.A + 1)).ToString();
                     return null;
             }
+        }
+
+        // ── Dynamic Resize ───────────────────────────────────────────────────
+
+        private void MeasureCharSize()
+        {
+            var tf = new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var ft = new FormattedText("W",
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight, tf, FontSize, Brushes.White,
+                VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            _charWidth = ft.WidthIncludingTrailingWhitespace;
+            _charHeight = ft.Height;
+            _charSizeMeasured = _charWidth > 0 && _charHeight > 0;
+        }
+
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!_charSizeMeasured) MeasureCharSize();
+            if (!_charSizeMeasured) return;
+
+            double availableWidth = ActualWidth - Padding.Left - Padding.Right - 20; // scrollbar
+            double availableHeight = ActualHeight - Padding.Top - Padding.Bottom;
+
+            int newCols = Math.Max(1, (int)(availableWidth / _charWidth));
+            int newRows = Math.Max(1, (int)(availableHeight / _charHeight));
+
+            if (newCols != _buffer.Cols || newRows != _buffer.Rows)
+            {
+                _buffer.Resize(newRows, newCols);
+                if (_buffer.IsDirty)
+                {
+                    RenderBuffer();
+                    _buffer.IsDirty = false;
+                }
+                TerminalResized?.Invoke((uint)newCols, (uint)newRows);
+            }
+        }
+
+        // ── Mouse Reporting ──────────────────────────────────────────────────
+
+        /// <summary>Convert a mouse position (WPF point) to terminal row/col (1-based).</summary>
+        private (int col, int row) MousePositionToCell(Point pos)
+        {
+            if (!_charSizeMeasured) MeasureCharSize();
+            if (!_charSizeMeasured) return (1, 1);
+
+            int col = Math.Max(1, (int)((pos.X - Padding.Left) / _charWidth) + 1);
+            int row = Math.Max(1, (int)((pos.Y - Padding.Top) / _charHeight) + 1);
+            return (col, row);
+        }
+
+        private void SendMouseEvent(int button, int col, int row, bool release)
+        {
+            if (_buffer.MouseEncoding == 1006)
+            {
+                // SGR format: ESC[<button;col;rowM (press) or ESC[<button;col;rowm (release)
+                char suffix = release ? 'm' : 'M';
+                UserInput?.Invoke($"\x1b[<{button};{col};{row}{suffix}");
+            }
+            else if (_buffer.MouseEncoding == 1015)
+            {
+                // URXVT format: ESC[button;col;rowM
+                UserInput?.Invoke($"\x1b[{button + 32};{col};{row}M");
+            }
+            else
+            {
+                // X10/normal format: ESC[M Cb Cx Cy (encoded as char + 32)
+                if (col <= 223 && row <= 223) // limit for traditional encoding
+                {
+                    int cb = button + 32;
+                    UserInput?.Invoke($"\x1b[M{(char)cb}{(char)(col + 32)}{(char)(row + 32)}");
+                }
+            }
+        }
+
+        private int MouseButtonNumber(MouseButton button)
+        {
+            return button switch
+            {
+                MouseButton.Left => 0,
+                MouseButton.Middle => 1,
+                MouseButton.Right => 2,
+                _ => 0
+            };
+        }
+
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_buffer.MouseMode == 0) return;
+            var pos = e.GetPosition(TextArea.TextView);
+            var (col, row) = MousePositionToCell(pos);
+            int btn = MouseButtonNumber(e.ChangedButton);
+
+            // Add modifier bits
+            if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) btn += 4;
+            if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0) btn += 8;
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) btn += 16;
+
+            SendMouseEvent(btn, col, row, false);
+            e.Handled = true;
+        }
+
+        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_buffer.MouseMode == 0) return;
+            if (_buffer.MouseMode == 9) return; // X10 mode doesn't report releases
+
+            var pos = e.GetPosition(TextArea.TextView);
+            var (col, row) = MousePositionToCell(pos);
+
+            if (_buffer.MouseEncoding == 1006)
+            {
+                // SGR: report actual button number on release
+                int btn = MouseButtonNumber(e.ChangedButton);
+                SendMouseEvent(btn, col, row, true);
+            }
+            else
+            {
+                // Normal/URXVT: release is button 3
+                SendMouseEvent(3, col, row, false);
+            }
+            e.Handled = true;
+        }
+
+        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            // Only report motion for modes 1002 (button-event) and 1003 (any-event)
+            if (_buffer.MouseMode < 1002) return;
+            if (_buffer.MouseMode == 1002 && e.LeftButton == MouseButtonState.Released &&
+                e.MiddleButton == MouseButtonState.Released && e.RightButton == MouseButtonState.Released)
+                return; // 1002 only reports motion while a button is pressed
+
+            var pos = e.GetPosition(TextArea.TextView);
+            var (col, row) = MousePositionToCell(pos);
+
+            int btn = 32; // motion flag
+            if (e.LeftButton == MouseButtonState.Pressed) btn += 0;
+            else if (e.MiddleButton == MouseButtonState.Pressed) btn += 1;
+            else if (e.RightButton == MouseButtonState.Pressed) btn += 2;
+            else btn += 3; // no button (any-event mode)
+
+            SendMouseEvent(btn, col, row, false);
+        }
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_buffer.MouseMode == 0) return;
+
+            var pos = e.GetPosition(TextArea.TextView);
+            var (col, row) = MousePositionToCell(pos);
+            int btn = e.Delta > 0 ? 64 : 65; // scroll up or down
+            SendMouseEvent(btn, col, row, false);
+            e.Handled = true;
         }
     }
 }

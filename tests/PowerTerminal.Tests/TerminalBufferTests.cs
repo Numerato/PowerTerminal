@@ -516,4 +516,266 @@ public class TerminalBufferTests
         Assert.Equal(brush, cell.Style.Foreground);
         Assert.True(cell.Style.IsBold);
     }
+
+    // ── Insert Mode ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void InsertMode_ShiftsCharactersRight()
+    {
+        var buf = CreateBuffer(5, 10);
+        for (int i = 0; i < 5; i++) buf.WriteChar((char)('A' + i)); // ABCDE
+        buf.InsertMode = true;
+        buf.SetCursorPosition(0, 2);
+        buf.WriteChar('X');
+
+        Assert.Equal('A', buf.GetCell(0, 0).Character);
+        Assert.Equal('B', buf.GetCell(0, 1).Character);
+        Assert.Equal('X', buf.GetCell(0, 2).Character);
+        Assert.Equal('C', buf.GetCell(0, 3).Character);
+        Assert.Equal('D', buf.GetCell(0, 4).Character);
+        Assert.Equal('E', buf.GetCell(0, 5).Character);
+    }
+
+    // ── Origin Mode ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void OriginMode_CursorPositionRelativeToScrollRegion()
+    {
+        var buf = CreateBuffer(10, 20);
+        buf.SetScrollRegion(2, 7); // rows 2-7
+        buf.OriginMode = true;
+        buf.SetCursorPosition(0, 0); // Should map to row 2
+
+        Assert.Equal(2, buf.CursorRow);
+        Assert.Equal(0, buf.CursorCol);
+    }
+
+    [Fact]
+    public void OriginMode_CursorClampedToScrollRegion()
+    {
+        var buf = CreateBuffer(10, 20);
+        buf.SetScrollRegion(2, 7); // rows 2-7
+        buf.OriginMode = true;
+        buf.SetCursorPosition(10, 0); // Should clamp to row 7
+
+        Assert.Equal(7, buf.CursorRow);
+    }
+
+    // ── Custom Tab Stops ─────────────────────────────────────────────────
+
+    [Fact]
+    public void SetTabStop_CreatesCustomStop()
+    {
+        var buf = CreateBuffer(5, 80);
+        buf.SetCursorPosition(0, 5);
+        buf.SetTabStop();
+        buf.SetCursorPosition(0, 0);
+        buf.Tab();
+
+        Assert.Equal(5, buf.CursorCol);
+    }
+
+    [Fact]
+    public void ClearAllTabStops_FallsBackToDefault()
+    {
+        var buf = CreateBuffer(5, 80);
+        buf.SetTabStop(); // Set at col 0
+        buf.ClearAllTabStops();
+        buf.SetCursorPosition(0, 1);
+        buf.Tab();
+
+        Assert.Equal(8, buf.CursorCol); // Default 8-column stop
+    }
+
+    [Fact]
+    public void ClearTabStop_RemovesSpecificStop()
+    {
+        var buf = CreateBuffer(5, 80);
+        buf.SetCursorPosition(0, 5);
+        buf.SetTabStop();
+        buf.ClearTabStop(); // Clear at col 5
+        buf.SetCursorPosition(0, 1);
+        buf.Tab();
+
+        // Should go to next default stop (8) since 5 was cleared
+        Assert.Equal(8, buf.CursorCol);
+    }
+
+    // ── REP — Repeat Last Character ──────────────────────────────────────
+
+    [Fact]
+    public void RepeatLastChar_RepeatsNTimes()
+    {
+        var buf = CreateBuffer(5, 20);
+        buf.WriteChar('X');
+        buf.RepeatLastChar(3);
+
+        Assert.Equal('X', buf.GetCell(0, 0).Character);
+        Assert.Equal('X', buf.GetCell(0, 1).Character);
+        Assert.Equal('X', buf.GetCell(0, 2).Character);
+        Assert.Equal('X', buf.GetCell(0, 3).Character);
+        Assert.Equal(4, buf.CursorCol);
+    }
+
+    [Fact]
+    public void RepeatLastChar_NoOpWhenNoCharWritten()
+    {
+        var buf = CreateBuffer(5, 20);
+        buf.RepeatLastChar(5);
+
+        Assert.Equal(0, buf.CursorCol);
+    }
+
+    // ── DECALN — Fill With E ─────────────────────────────────────────────
+
+    [Fact]
+    public void FillWithE_FillsEntireScreen()
+    {
+        var buf = CreateBuffer(3, 5);
+        buf.FillWithE();
+
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 5; c++)
+                Assert.Equal('E', buf.GetCell(r, c).Character);
+
+        Assert.Equal(0, buf.CursorRow);
+        Assert.Equal(0, buf.CursorCol);
+    }
+
+    // ── Soft Reset ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void SoftReset_ResetsModesButKeepsContent()
+    {
+        var buf = CreateBuffer(5, 10);
+        buf.WriteChar('X');
+        buf.AutoWrap = false;
+        buf.OriginMode = true;
+        buf.InsertMode = true;
+        buf.ApplicationCursorKeys = true;
+
+        buf.SoftReset();
+
+        // Content preserved
+        Assert.Equal('X', buf.GetCell(0, 0).Character);
+        // Modes reset
+        Assert.True(buf.AutoWrap);
+        Assert.False(buf.OriginMode);
+        Assert.False(buf.InsertMode);
+        Assert.False(buf.ApplicationCursorKeys);
+        Assert.True(buf.CursorVisible);
+    }
+
+    // ── Save/Restore DEC Modes ───────────────────────────────────────────
+
+    [Fact]
+    public void SaveRestoreDecMode_Works()
+    {
+        var buf = CreateBuffer(5, 10);
+        buf.ApplicationCursorKeys = true;
+        buf.SaveDecMode(1, buf.GetDecMode(1));
+
+        buf.ApplicationCursorKeys = false;
+        var saved = buf.RestoreDecMode(1);
+
+        Assert.True(saved.HasValue);
+        Assert.True(saved.Value);
+    }
+
+    [Fact]
+    public void RestoreDecMode_ReturnsNullWhenNotSaved()
+    {
+        var buf = CreateBuffer(5, 10);
+        Assert.Null(buf.RestoreDecMode(999));
+    }
+
+    // ── Blink and Hidden style ───────────────────────────────────────────
+
+    [Fact]
+    public void Style_BlinkAndHidden_Applied()
+    {
+        var buf = CreateBuffer(5, 10);
+        buf.CurrentStyle.IsBlink = true;
+        buf.CurrentStyle.IsHidden = true;
+        buf.WriteChar('X');
+
+        var cell = buf.GetCell(0, 0);
+        Assert.True(cell.Style.IsBlink);
+        Assert.True(cell.Style.IsHidden);
+    }
+
+    [Fact]
+    public void Style_UnderlineColor_Applied()
+    {
+        var buf = CreateBuffer(5, 10);
+        var brush = new SolidColorBrush(Colors.Blue);
+        brush.Freeze();
+        buf.CurrentStyle.IsUnderline = true;
+        buf.CurrentStyle.UnderlineColor = brush;
+        buf.WriteChar('X');
+
+        var cell = buf.GetCell(0, 0);
+        Assert.True(cell.Style.IsUnderline);
+        Assert.Equal(brush, cell.Style.UnderlineColor);
+    }
+
+    // ── Mouse/Focus/Sync mode flags ──────────────────────────────────────
+
+    [Fact]
+    public void MouseMode_DefaultsToOff()
+    {
+        var buf = CreateBuffer(5, 10);
+        Assert.Equal(0, buf.MouseMode);
+        Assert.Equal(0, buf.MouseEncoding);
+    }
+
+    [Fact]
+    public void FocusReporting_DefaultsToOff()
+    {
+        var buf = CreateBuffer(5, 10);
+        Assert.False(buf.FocusReporting);
+    }
+
+    [Fact]
+    public void CursorShape_DefaultsToZero()
+    {
+        var buf = CreateBuffer(5, 10);
+        Assert.Equal(0, buf.CursorShape);
+    }
+
+    [Fact]
+    public void FullReset_ClearsAllNewModes()
+    {
+        var buf = CreateBuffer(5, 10);
+        buf.OriginMode = true;
+        buf.InsertMode = true;
+        buf.FocusReporting = true;
+        buf.SynchronizedOutput = true;
+        buf.MouseMode = 1000;
+        buf.MouseEncoding = 1006;
+        buf.CursorShape = 3;
+
+        buf.FullReset();
+
+        Assert.False(buf.OriginMode);
+        Assert.False(buf.InsertMode);
+        Assert.False(buf.FocusReporting);
+        Assert.False(buf.SynchronizedOutput);
+        Assert.Equal(0, buf.MouseMode);
+        Assert.Equal(0, buf.MouseEncoding);
+        Assert.Equal(0, buf.CursorShape);
+    }
+
+    // ── GetDecMode ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetDecMode_ReturnsCorrectValues()
+    {
+        var buf = CreateBuffer(5, 10);
+        buf.ApplicationCursorKeys = true;
+        Assert.True(buf.GetDecMode(1));
+        Assert.False(buf.GetDecMode(6)); // OriginMode
+        buf.OriginMode = true;
+        Assert.True(buf.GetDecMode(6));
+    }
 }
