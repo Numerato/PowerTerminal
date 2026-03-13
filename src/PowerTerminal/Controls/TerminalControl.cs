@@ -184,7 +184,10 @@ namespace PowerTerminal.Controls
 
             if (Interlocked.CompareExchange(ref _isRendering, 1, 0) == 0)
             {
-                Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Normal);
+                // Use Background priority so the UI stays responsive during large output
+                // bursts (e.g. "apt list"). Higher-priority input/render events can
+                // interleave between processing batches.
+                Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
@@ -231,7 +234,7 @@ namespace PowerTerminal.Controls
                 {
                     if (Interlocked.CompareExchange(ref _isRendering, 1, 0) == 0)
                     {
-                        Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Normal);
+                        Dispatcher.InvokeAsync(ProcessQueue, System.Windows.Threading.DispatcherPriority.Background);
                     }
                 }
             }
@@ -972,8 +975,20 @@ namespace PowerTerminal.Controls
                 }
             }
 
-            // 2. Render visible screen
-            for (int r = 0; r < _buffer.Rows; r++)
+            // 2. Render visible screen — only up to the last row that has content
+            //    or holds the cursor. Empty trailing rows are skipped so the document
+            //    stays compact (no spurious scrollbar) until real content fills them.
+            int lastContentRow = _buffer.CursorRow; // always render at least the cursor row
+            for (int r = _buffer.Rows - 1; r > lastContentRow; r--)
+            {
+                for (int c = 0; c < _buffer.Cols; c++)
+                {
+                    char ch = _buffer.GetCell(r, c).Character;
+                    if (ch != ' ' && ch != '\0') { lastContentRow = r; break; }
+                }
+            }
+
+            for (int r = 0; r <= lastContentRow; r++)
             {
                 int lineStart = offset;
                 int lastNonSpace = -1;
@@ -1006,8 +1021,8 @@ namespace PowerTerminal.Controls
                     offset++;
                 }
 
-                // Add newline for all rows except the last
-                if (r < _buffer.Rows - 1)
+                // Add newline between rows (not after the last rendered row)
+                if (r < lastContentRow)
                 {
                     sb.Append('\n');
                     offset++;
@@ -1085,7 +1100,10 @@ namespace PowerTerminal.Controls
             // Cursor visibility: hide/show caret based on buffer flag
             TextArea.Caret.CaretBrush = _buffer.CursorVisible ? TerminalCaret : TerminalCaretHidden;
 
-            ScrollToEnd();
+            // Scroll so the caret (cursor) is always visible — this keeps the active
+            // line in view whether we're mid-screen (password prompt) or at the bottom
+            // of a full scrollback history.
+            TextArea.Caret.BringCaretToView();
         }
 
         private static void AddSegment(List<ColorSegment> segments, int offset, int length,

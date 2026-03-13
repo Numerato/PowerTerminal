@@ -249,12 +249,12 @@ namespace PowerTerminal.ViewModels
 
         /// <summary>
         /// Called when an OSC sequence sets the window title.
-        /// Updates the tab header to reflect the title from the remote shell.
+        /// Intentionally ignored — the tab header always shows the user-defined
+        /// connection name, not whatever the remote shell decides to set.
         /// </summary>
         public void SetTitle(string title)
         {
-            if (!string.IsNullOrWhiteSpace(title))
-                Header = title;
+            // No-op: keep the connection name as the tab header.
         }
 
         /// <summary>

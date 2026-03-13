@@ -12,7 +12,12 @@
                               TerminalFontSize="{Binding Theme.FontSize}"
                               Padding="{Binding TerminalPadding}"
                               VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled" />
+                              HorizontalScrollBarVisibility="Disabled">
+            <ctrl:TerminalControl.Resources>
+                <Style TargetType="{x:Type ScrollBar}"
+                       BasedOn="{StaticResource TerminalScrollBar}"/>
+            </ctrl:TerminalControl.Resources>
+        </ctrl:TerminalControl>
 
     </Grid>
 </UserControl>

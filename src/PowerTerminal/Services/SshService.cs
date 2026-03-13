@@ -108,9 +108,7 @@ namespace PowerTerminal.Services
                     {
                         _client.Dispose();
                         _client = null;
-                        // Emit failure line into the terminal so the user sees it
-                        // before the password prompt appears.
-                        LocalWrite?.Invoke("\r\nConnection failed: Permission denied (publickey).\r\n");
+                        // Silently fall through to password prompt.
                     }
                 }
 
