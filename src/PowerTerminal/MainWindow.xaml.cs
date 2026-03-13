@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,16 +22,36 @@ namespace PowerTerminal
             DataContext = Vm;
 
             Vm.OpenConnectionManagerRequested += OpenConnectionManager;
-            Vm.OpenSettingsRequested          += OpenSettings;
             Vm.OpenWikiEditorRequested        += OpenWikiEditor;
             Vm.VariablePromptRequested        += PromptVariable;
 
             StateChanged += (_, _) => UpdateMaxRestoreIcon();
 
-            // Block ApplicationCommands.Help so it never executes (F1 would open
-            // a help dialog; we want it to reach the terminal's PreviewKeyDown instead).
+            // Maximize on startup
+            WindowState = WindowState.Normal;
+
+            // Watch panel open/close to resize the panel column to 30% or 0
+            Vm.PropertyChanged += OnVmPropertyChanged;
+
+            // Block F1 help dialog
             CommandBindings.Add(new CommandBinding(ApplicationCommands.Help,
                 (_, e) => e.Handled = true));
+        }
+
+        private void OnVmPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(MainViewModel.IsPanelOpen)) return;
+
+            if (Vm.IsPanelOpen)
+            {
+                // 30% of the available width (total minus sidebar strip)
+                double available = ActualWidth - 34;
+                PanelColumn.Width = new GridLength(available * 0.30, GridUnitType.Pixel);
+            }
+            else
+            {
+                PanelColumn.Width = new GridLength(0, GridUnitType.Pixel);
+            }
         }
 
         // F1 generates a routed Help command that WPF processes via KeyDown tunnelling.
@@ -80,7 +101,7 @@ namespace PowerTerminal
         // ── Title bar buttons ────────────────────────────────────────────────
 
         private void Settings_Click(object sender, RoutedEventArgs e)
-            => Vm.OpenSettingsCommand.Execute(null);
+            => Vm.TogglePanelCommand.Execute("settings");
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
             => WindowState = WindowState.Minimized;
@@ -110,14 +131,6 @@ namespace PowerTerminal
                 Vm.ConnectSelectedCommand.Execute(null);
         }
 
-        private void OpenSettings()
-        {
-            var win = new SettingsWindow { Owner = this };
-            if (win.ShowDialog() == true)
-            {
-                Vm.RefreshSettings();
-            }
-        }
 
         private void OpenWikiEditor(WikiEditorViewModel vm)
         {

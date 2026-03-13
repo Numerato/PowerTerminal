@@ -749,6 +749,37 @@
         </Setter>
     </Style>
 
+    <!-- ── Sidebar icon button (right activity bar) ──────────────────────────
+         48×48, white icon, orange pill background when IsChecked/active.      -->
+    <Style x:Key="SidebarButton" TargetType="ToggleButton">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Width"      Value="26"/>
+        <Setter Property="Height"     Value="26"/>
+        <Setter Property="Cursor"     Value="Hand"/>
+        <Setter Property="Focusable"  Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Bg"
+                            Background="Transparent"
+                            CornerRadius="6"
+                            Margin="2,2">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="#33FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ── Slim modern scrollbar for the terminal ─────────────────────────────
          6 px wide track, rounded thumb, no arrow buttons, fades when not hovered. -->
 

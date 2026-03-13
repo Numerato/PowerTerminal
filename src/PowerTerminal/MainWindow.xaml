@@ -202,24 +202,12 @@
             </Grid>
           </DockPanel>
 
-          <!-- Right: settings + window controls (no status text) -->
+          <!-- Right: window controls -->
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
                       VerticalAlignment="Stretch"
                       WindowChrome.IsHitTestVisibleInChrome="True">
 
-            <!-- Settings gear (orange) -->
-            <Button Style="{StaticResource TitleBarButton}"
-                    Click="Settings_Click"
-
-                    Margin="0,3,6,0"
-                    ToolTip="Settings">
-              <TextBlock Text="⚙"
-                         FontSize="12"
-                         FontWeight="Bold"
-                         VerticalAlignment="Center" />
-
-            </Button>
 
             <!-- Minimize -->
             <Button Style="{StaticResource WinControlButton}"
@@ -255,19 +243,23 @@
       <!-- ════════════ CONTENT AREA ════════════ -->
       <Grid Grid.Row="1">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" MinWidth="300" />
-          <ColumnDefinition Width="4" />
-          <ColumnDefinition Width="480" MinWidth="300" />
+          <!-- Terminal -->
+          <ColumnDefinition Width="*" MinWidth="200" />
+          <!-- Splitter -->
+          <ColumnDefinition Width="Auto" />
+          <!-- Right panel — width managed from code-behind (0 when closed, 30% when open) -->
+          <ColumnDefinition x:Name="PanelColumn" Width="0" MinWidth="0" />
+          <!-- Sidebar icon strip — same width as the title bar height (34 px) -->
+          <ColumnDefinition Width="34" />
         </Grid.ColumnDefinitions>
 
-        <!-- Active terminal content -->
+        <!-- ── Terminal area ── -->
         <Grid Grid.Column="0">
-          <!-- Welcome placeholder (shown when no tabs are open) -->
+          <!-- Welcome placeholder -->
           <StackPanel HorizontalAlignment="Center"
                       VerticalAlignment="Center"
                       Visibility="{Binding ActiveTerminalTab,
                                     Converter={StaticResource NullToVisInvertConverter}}">
-
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Center"
                         Margin="0,0,0,14">
@@ -280,22 +272,15 @@
                          Foreground="{StaticResource AccentBrush}"
                          VerticalAlignment="Center" />
             </StackPanel>
-
             <TextBlock Text="Click + to open a connection"
                        Foreground="{StaticResource ForegroundDimBrush}"
                        FontSize="14"
                        HorizontalAlignment="Center" />
           </StackPanel>
 
-          <!-- One persistent TerminalTabView per tab VM.
-                         Only the active tab's view is Visible; the rest are Collapsed so they
-                         remain in memory (preserving terminal history and SSH state) but take
-                         no layout space and receive no keyboard events. -->
           <ItemsControl ItemsSource="{Binding TerminalTabs}">
             <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <Grid />
-              </ItemsPanelTemplate>
+              <ItemsPanelTemplate><Grid /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemContainerStyle>
               <Style TargetType="ContentPresenter">
@@ -306,30 +291,137 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
                 <views:TerminalTabView
-                  Visibility="{Binding IsActive,
-                                        Converter={StaticResource BoolToVisConverter}}" />
+                  Visibility="{Binding IsActive, Converter={StaticResource BoolToVisConverter}}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </Grid>
 
-        <!-- Splitter -->
-        <GridSplitter Grid.Column="1" Width="2"
+        <!-- ── Splitter ── -->
+        <GridSplitter Grid.Column="1"
+                      Width="2"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
-                      ResizeBehavior="PreviousAndNext" />
+                      ResizeBehavior="PreviousAndNext"
+                      Background="{StaticResource BorderBrush}"/>
 
-        <!-- RIGHT: AI Chat + Wiki tabs -->
-        <TabControl Grid.Column="2"
-                    SelectedIndex="{Binding RightTabIndex, Mode=TwoWay}"
-                    Background="{StaticResource SurfaceBrush}">
-          <TabItem Header="AI Chat">
-            <views:AiChatView DataContext="{Binding AiChat}" />
-          </TabItem>
-          <TabItem Header="Wiki">
-            <views:WikiView DataContext="{Binding Wiki}" />
-          </TabItem>
-        </TabControl>
+        <!-- ── Right panel (Wiki / AI Chat / Explorer / Settings) ── -->
+        <Border Grid.Column="2"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1,0,0,0"
+                Background="{StaticResource SurfaceBrush}">
+          <Grid>
+            <!-- Wiki panel -->
+            <views:WikiView DataContext="{Binding Wiki}"
+                            Visibility="{Binding DataContext.WikiPanelActive,
+                                         RelativeSource={RelativeSource AncestorType=Window},
+                                         Converter={StaticResource BoolToVisConverter}}"/>
+            <!-- AI Chat panel -->
+            <views:AiChatView DataContext="{Binding AiChat}"
+                              Visibility="{Binding DataContext.AiChatPanelActive,
+                                           RelativeSource={RelativeSource AncestorType=Window},
+                                           Converter={StaticResource BoolToVisConverter}}"/>
+            <!-- Explorer placeholder -->
+            <Grid Visibility="{Binding DataContext.ExplorerPanelActive,
+                                RelativeSource={RelativeSource AncestorType=Window},
+                                Converter={StaticResource BoolToVisConverter}}">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <Border Grid.Row="0"
+                      BorderBrush="{StaticResource BorderBrush}"
+                      BorderThickness="0,0,0,1"
+                      Padding="16,10">
+                <TextBlock Text="Explorer"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+              </Border>
+              <StackPanel Grid.Row="1"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                <TextBlock Text="&#xE8B7;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="40"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,12"/>
+                <TextBlock Text="Coming soon"
+                           FontSize="13"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           HorizontalAlignment="Center"/>
+              </StackPanel>
+            </Grid>
+            <!-- Settings panel -->
+            <views:SettingsPanelView
+                        Visibility="{Binding DataContext.SettingsPanelActive,
+                                     RelativeSource={RelativeSource AncestorType=Window},
+                                     Converter={StaticResource BoolToVisConverter}}"/>
+          </Grid>
+        </Border>
+
+        <!-- ── Right activity sidebar ── -->
+        <Border Grid.Column="3"
+                Background="{StaticResource TitleBarBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1,0,0,0">
+          <StackPanel VerticalAlignment="Top"
+                      Margin="0,6,0,0">
+
+            <!-- Wiki -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding WikiPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="wiki"
+                          ToolTip="Wiki"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE736;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- AI Chat -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding AiChatPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="aichat"
+                          ToolTip="AI Chat"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE8BD;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- Explorer -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding ExplorerPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="explorer"
+                          ToolTip="Explorer"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xEC50;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- Settings -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding SettingsPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="settings"
+                          ToolTip="Settings"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE713;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+          </StackPanel>
+        </Border>
       </Grid>
     </Grid>
   </Border>

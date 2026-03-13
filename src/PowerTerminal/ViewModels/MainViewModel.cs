@@ -14,7 +14,7 @@ namespace PowerTerminal.ViewModels
         private readonly AiService _ai;
         private readonly WikiService _wiki;
         private TerminalTabViewModel? _activeTerminalTab;
-        private int _rightTabIndex;
+        private string? _activePanel = null; // null = closed
 
         public MainViewModel()
         {
@@ -43,6 +43,7 @@ namespace PowerTerminal.ViewModels
             DeleteWikiCommand          = new RelayCommand(_ => DeleteWiki(), _ => Wiki.SelectedEntry != null);
             ConnectSelectedCommand     = new RelayCommand(_ => ConnectSelectedConnection(),
                                                           _ => ConnectionManager.Selected != null);
+            TogglePanelCommand         = new RelayCommand(p => TogglePanel(p as string));
 
             // Load connections and open default tab
             LoadDefaultTabs();
@@ -69,6 +70,7 @@ namespace PowerTerminal.ViewModels
         public ICommand EditWikiCommand               { get; }
         public ICommand DeleteWikiCommand             { get; }
         public ICommand ConnectSelectedCommand        { get; }
+        public ICommand TogglePanelCommand            { get; }
 
         // Events to trigger window/dialog opening from View
         public event Action? OpenConnectionManagerRequested;
@@ -85,7 +87,6 @@ namespace PowerTerminal.ViewModels
             {
                 if (Set(ref _activeTerminalTab, value))
                 {
-                    // Keep IsActive in sync so each tab's TerminalTabView shows/hides itself
                     foreach (var tab in TerminalTabs)
                         tab.IsActive = (tab == value);
                     Wiki.ActiveTerminal = value;
@@ -93,10 +94,32 @@ namespace PowerTerminal.ViewModels
             }
         }
 
-        public int RightTabIndex
+        /// <summary>Currently open sidebar panel key, or null when the panel is closed.</summary>
+        public string? ActivePanel
         {
-            get => _rightTabIndex;
-            set => Set(ref _rightTabIndex, value);
+            get => _activePanel;
+            private set
+            {
+                if (Set(ref _activePanel, value))
+                {
+                    OnPropertyChanged(nameof(IsPanelOpen));
+                    OnPropertyChanged(nameof(WikiPanelActive));
+                    OnPropertyChanged(nameof(AiChatPanelActive));
+                    OnPropertyChanged(nameof(ExplorerPanelActive));
+                    OnPropertyChanged(nameof(SettingsPanelActive));
+                }
+            }
+        }
+
+        public bool IsPanelOpen        => _activePanel != null;
+        public bool WikiPanelActive    => _activePanel == "wiki";
+        public bool AiChatPanelActive  => _activePanel == "aichat";
+        public bool ExplorerPanelActive=> _activePanel == "explorer";
+        public bool SettingsPanelActive=> _activePanel == "settings";
+
+        private void TogglePanel(string? key)
+        {
+            ActivePanel = (ActivePanel == key) ? null : key;
         }
 
         private void LoadDefaultTabs()
