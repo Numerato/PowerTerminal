@@ -160,7 +160,7 @@
         <Setter Property="Background"                 Value="Transparent"/>
         <Setter Property="Foreground"                 Value="{StaticResource ForegroundBrush}"/>
         <Setter Property="BorderThickness"            Value="0"/>
-        <Setter Property="Padding"                    Value="14,8"/>
+        <Setter Property="Padding"                    Value="10,9"/>
         <Setter Property="HorizontalAlignment"        Value="Stretch"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="Cursor"                     Value="Hand"/>
@@ -172,6 +172,8 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Margin="4,1"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center"/>
@@ -196,13 +198,13 @@
         <Setter Property="Background"      Value="Transparent"/>
         <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Width"           Value="46"/>
-        <Setter Property="Height"          Value="44"/>
+        <Setter Property="Width"           Value="40"/>
+        <Setter Property="Height"          Value="26"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="5">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                 </ControlTemplate>
@@ -322,40 +324,33 @@
 
     <!-- ── Tab strip item (each terminal tab in the title bar) ───────────── -->
     <Style x:Key="TabStripItem" TargetType="ListBoxItem">
-        <Setter Property="Background"              Value="Transparent"/>
-        <Setter Property="Foreground"              Value="{StaticResource ForegroundDimBrush}"/>
-        <Setter Property="Padding"                 Value="12,0"/>
-        <Setter Property="Height"                  Value="44"/>
-        <Setter Property="Cursor"                  Value="Hand"/>
+        <Setter Property="Background"               Value="Transparent"/>
+        <Setter Property="Foreground"               Value="{StaticResource ForegroundDimBrush}"/>
+        <Setter Property="Padding"                  Value="12,0"/>
+        <Setter Property="Height"                   Value="26"/>
+        <Setter Property="Margin"                   Value="2,4,2,4"/>
+        <Setter Property="Cursor"                   Value="Hand"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="FocusVisualStyle"        Value="{x:Null}"/>
+        <Setter Property="FocusVisualStyle"         Value="{x:Null}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
-                    <Grid>
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center"/>
-                        </Border>
-                        <Rectangle x:Name="ActiveLine"
-                                   VerticalAlignment="Bottom"
-                                   Height="2"
-                                   Fill="{StaticResource AccentBrush}"
-                                   Visibility="Collapsed"/>
-                    </Grid>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter VerticalAlignment="Center"/>
+                    </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Bd" Property="Background"
                                     Value="{StaticResource BackgroundBrush}"/>
                             <Setter Property="Foreground"
                                     Value="{StaticResource ForegroundBrush}"/>
-                            <Setter TargetName="ActiveLine" Property="Visibility"
-                                    Value="Visible"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background"
-                                    Value="{StaticResource SurfaceHighBrush}"/>
+                                    Value="#22FFFFFF"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
