@@ -86,7 +86,12 @@ namespace PowerTerminal.Views
                     var result = string.Empty;
                     Dispatcher.Invoke(() =>
                     {
-                        Terminal.CollectHiddenInput(prompt, pw =>
+                        // 1. Write the prompt text and force it to render immediately
+                        //    so the user sees it before we block waiting for input.
+                        Terminal.AppendAnsiData(prompt);
+                        Terminal.UpdateLayout();
+                        // 2. Arm hidden-input mode with no additional prompt text.
+                        Terminal.CollectHiddenInput(string.Empty, pw =>
                         {
                             result = pw;
                             mre.Set();

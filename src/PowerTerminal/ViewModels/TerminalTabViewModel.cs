@@ -167,6 +167,10 @@ namespace PowerTerminal.ViewModels
                     SshKeysFolder = SshKeysFolder
                 };
 
+                // SSH status lines (e.g. "Connection failed: Permission denied (publickey).")
+                // are written directly into the terminal on the UI thread.
+                _ssh.LocalWrite = text => WriteToTerminal(text);
+
                 // Inline password prompt: the SSH background thread calls this callback,
                 // which blocks until the user types a password in the terminal and presses Enter.
                 _ssh.PasswordPrompt = prompt =>
