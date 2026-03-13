@@ -975,57 +975,75 @@ namespace PowerTerminal.Controls
                 }
             }
 
-            // 2. Render visible screen — only up to the last row that has content
-            //    or holds the cursor. Empty trailing rows are skipped so the document
-            //    stays compact (no spurious scrollbar) until real content fills them.
-            int lastContentRow = _buffer.CursorRow; // always render at least the cursor row
-            for (int r = _buffer.Rows - 1; r > lastContentRow; r--)
+            // 2. Render visible screen
+            if (_buffer.IsAlternateBuffer)
             {
-                for (int c = 0; c < _buffer.Cols; c++)
+                // Alternate screen (htop, nano, vim…): render ALL rows exactly so the
+                // document is the same height as the terminal — no scrollbar needed.
+                for (int r = 0; r < _buffer.Rows; r++)
                 {
-                    char ch = _buffer.GetCell(r, c).Character;
-                    if (ch != ' ' && ch != '\0') { lastContentRow = r; break; }
+                    int lastNonSpace = -1;
+                    for (int c = 0; c < _buffer.Cols; c++)
+                    {
+                        char ch = _buffer.GetCell(r, c).Character;
+                        if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                    }
+
+                    int renderTo = lastNonSpace;
+                    if (r == _buffer.CursorRow)
+                        renderTo = Math.Max(renderTo, _buffer.CursorCol);
+
+                    for (int c = 0; c <= renderTo; c++)
+                    {
+                        var cell = _buffer.GetCell(r, c);
+                        char ch = cell.Character == '\0' ? ' ' : cell.Character;
+                        sb.Append(ch);
+                        if (cell.Style.IsNonDefault)
+                            AddSegment(newSegments, offset, 1, cell.Style);
+                        offset++;
+                    }
+
+                    if (r < _buffer.Rows - 1) { sb.Append('\n'); offset++; }
                 }
             }
-
-            for (int r = 0; r <= lastContentRow; r++)
+            else
             {
-                int lineStart = offset;
-                int lastNonSpace = -1;
-
-                // Find last non-space character on this row
-                for (int c = 0; c < _buffer.Cols; c++)
+                // Primary screen: only render rows up to the last row that has content
+                // or holds the cursor — keeps the document compact when few lines used.
+                int lastContentRow = _buffer.CursorRow;
+                for (int r = _buffer.Rows - 1; r > lastContentRow; r--)
                 {
-                    char ch = _buffer.GetCell(r, c).Character;
-                    if (ch != ' ' && ch != '\0') lastNonSpace = c;
-                }
-
-                // Always render at least one column (even if empty) for cursor visibility
-                int renderTo = lastNonSpace;
-
-                // If cursor is on this row, extend rendering to cursor position
-                if (r == _buffer.CursorRow)
-                    renderTo = Math.Max(renderTo, _buffer.CursorCol);
-
-                for (int c = 0; c <= renderTo; c++)
-                {
-                    var cell = _buffer.GetCell(r, c);
-                    char ch = cell.Character;
-                    if (ch == '\0') ch = ' ';
-                    sb.Append(ch);
-
-                    if (cell.Style.IsNonDefault)
+                    for (int c = 0; c < _buffer.Cols; c++)
                     {
-                        AddSegment(newSegments, offset, 1, cell.Style);
+                        char ch = _buffer.GetCell(r, c).Character;
+                        if (ch != ' ' && ch != '\0') { lastContentRow = r; break; }
                     }
-                    offset++;
                 }
 
-                // Add newline between rows (not after the last rendered row)
-                if (r < lastContentRow)
+                for (int r = 0; r <= lastContentRow; r++)
                 {
-                    sb.Append('\n');
-                    offset++;
+                    int lastNonSpace = -1;
+                    for (int c = 0; c < _buffer.Cols; c++)
+                    {
+                        char ch = _buffer.GetCell(r, c).Character;
+                        if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                    }
+
+                    int renderTo = lastNonSpace;
+                    if (r == _buffer.CursorRow)
+                        renderTo = Math.Max(renderTo, _buffer.CursorCol);
+
+                    for (int c = 0; c <= renderTo; c++)
+                    {
+                        var cell = _buffer.GetCell(r, c);
+                        char ch = cell.Character == '\0' ? ' ' : cell.Character;
+                        sb.Append(ch);
+                        if (cell.Style.IsNonDefault)
+                            AddSegment(newSegments, offset, 1, cell.Style);
+                        offset++;
+                    }
+
+                    if (r < lastContentRow) { sb.Append('\n'); offset++; }
                 }
             }
 
@@ -1046,6 +1064,13 @@ namespace PowerTerminal.Controls
             {
                 Document.EndUpdate();
             }
+
+            // Hide scrollbar in alternate-buffer mode (htop, nano, vim…) — those apps
+            // own the full screen and there is nothing to scroll. Show it in primary
+            // mode so scrollback history is reachable.
+            SetInternalScrollBarVisibility(_buffer.IsAlternateBuffer
+                ? ScrollBarVisibility.Hidden
+                : ScrollBarVisibility.Auto);
 
             // 4. Position caret and scroll
             PositionCaret();
@@ -1104,6 +1129,31 @@ namespace PowerTerminal.Controls
             // line in view whether we're mid-screen (password prompt) or at the bottom
             // of a full scrollback history.
             TextArea.Caret.BringCaretToView();
+        }
+
+        private ScrollBarVisibility _currentScrollBarVisibility = ScrollBarVisibility.Hidden;
+
+        /// <summary>
+        /// Walk the visual tree to find AvalonEdit's internal ScrollViewer and toggle
+        /// the vertical scrollbar visibility. Called every render to track buffer mode.
+        /// </summary>
+        private void SetInternalScrollBarVisibility(ScrollBarVisibility visibility)
+        {
+            if (_currentScrollBarVisibility == visibility) return;
+            _currentScrollBarVisibility = visibility;
+
+            // AvalonEdit's TextEditor template contains a ScrollViewer named PART_ScrollViewer.
+            // Walk the immediate visual children to find it.
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(this); i++)
+            {
+                if (VisualTreeHelper.GetChild(this, i) is ScrollViewer sv)
+                {
+                    sv.VerticalScrollBarVisibility = visibility;
+                    return;
+                }
+            }
+            // Fallback: set the attached property (works if the template reads it)
+            ScrollViewer.SetVerticalScrollBarVisibility(this, visibility);
         }
 
         private static void AddSegment(List<ColorSegment> segments, int offset, int length,
@@ -1511,8 +1561,8 @@ namespace PowerTerminal.Controls
             if (!_charSizeMeasured) MeasureCharSize();
             if (!_charSizeMeasured) return;
 
-            double availableWidth = ActualWidth - Padding.Left - Padding.Right - 20; // scrollbar
-            double availableHeight = ActualHeight - Padding.Top - Padding.Bottom;
+            double availableWidth  = ActualWidth  - Padding.Left - Padding.Right;
+            double availableHeight = ActualHeight - Padding.Top  - Padding.Bottom;
 
             int newCols = Math.Max(1, (int)(availableWidth / _charWidth));
             int newRows = Math.Max(1, (int)(availableHeight / _charHeight));

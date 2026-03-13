@@ -2,7 +2,9 @@ using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
+using PowerTerminal.Controls;
 using PowerTerminal.Models;
 using PowerTerminal.ViewModels;
 using PowerTerminal.Views;
@@ -24,6 +26,23 @@ namespace PowerTerminal
             Vm.VariablePromptRequested        += PromptVariable;
 
             StateChanged += (_, _) => UpdateMaxRestoreIcon();
+
+            // Block ApplicationCommands.Help so it never executes (F1 would open
+            // a help dialog; we want it to reach the terminal's PreviewKeyDown instead).
+            CommandBindings.Add(new CommandBinding(ApplicationCommands.Help,
+                (_, e) => e.Handled = true));
+        }
+
+        // F1 generates a routed Help command that WPF processes via KeyDown tunnelling.
+        // Intercept it here so it never fires, letting PreviewKeyDown in TerminalControl handle it.
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.Key == Key.F1 && FocusManager.GetFocusedElement(this) is TerminalControl)
+            {
+                e.Handled = true;
+                return;
+            }
+            base.OnKeyDown(e);
         }
 
         // ── Tab lifecycle ────────────────────────────────────────────────────
@@ -31,7 +50,11 @@ namespace PowerTerminal
         private void CloseTab_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is TerminalTabViewModel tab)
-                Vm.RemoveTab(tab);
+            {
+                var dlg = new DarkConfirmWindow("Close tab", $"Close \"{tab.Header}\"?") { Owner = this };
+                if (dlg.ShowDialog() == true)
+                    Vm.RemoveTab(tab);
+            }
         }
 
         // ── Connect dropdown ─────────────────────────────────────────────────
@@ -117,7 +140,9 @@ namespace PowerTerminal
             hwndSource?.AddHook(WndProc);
         }
 
-        private const int WM_GETMINMAXINFO = 0x0024;
+        private const int WM_GETMINMAXINFO  = 0x0024;
+        private const int WM_SYSKEYDOWN     = 0x0104;
+        private const int VK_F10            = 0x79;
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
@@ -125,6 +150,13 @@ namespace PowerTerminal
             {
                 WmGetMinMaxInfo(hwnd, lParam);
                 handled = true;
+            }
+            else if (msg == WM_SYSKEYDOWN && wParam.ToInt32() == VK_F10)
+            {
+                // F10 sends WM_SYSKEYDOWN which WPF uses to activate the window menu.
+                // Swallow it when the terminal has focus so it reaches OnPreviewKeyDown.
+                if (FocusManager.GetFocusedElement(this) is Controls.TerminalControl)
+                    handled = true;
             }
             return IntPtr.Zero;
         }
