@@ -43,6 +43,7 @@
     <SolidColorBrush x:Key="SurfaceBrush"          Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="SurfaceHighBrush"      Color="{StaticResource SurfaceHighColor}"/>
     <SolidColorBrush x:Key="TitleBarBrush"         Color="{StaticResource TitleBarColor}"/>
+    <SolidColorBrush x:Key="PanelBrush"            Color="{StaticResource TitleBarColor}"/>
     <SolidColorBrush x:Key="BorderBrush"           Color="{StaticResource BorderColor}"/>
     <SolidColorBrush x:Key="ForegroundBrush"       Color="{StaticResource ForegroundColor}"/>
     <SolidColorBrush x:Key="ForegroundDimBrush"    Color="{StaticResource ForegroundDimColor}"/>
@@ -748,8 +749,8 @@
          48×48, white icon, orange pill background when IsChecked/active.      -->
     <Style x:Key="SidebarButton" TargetType="ToggleButton">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
-        <Setter Property="Width"      Value="26"/>
-        <Setter Property="Height"     Value="26"/>
+        <Setter Property="Width"      Value="30"/>
+        <Setter Property="Height"     Value="30"/>
         <Setter Property="Cursor"     Value="Hand"/>
         <Setter Property="Focusable"  Value="False"/>
         <Setter Property="Template">
@@ -758,7 +759,7 @@
                     <Border x:Name="Bg"
                             Background="Transparent"
                             CornerRadius="6"
-                            Margin="2,2">
+                            Margin="2,5">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                     </Border>
