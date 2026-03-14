@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using PowerTerminal.Controls;
 using PowerTerminal.Models;
 using PowerTerminal.Services;
 
@@ -21,6 +22,9 @@ namespace PowerTerminal.ViewModels
         private bool _isConnecting;
         private string _statusText = "Disconnected";
         private MachineInfo? _machineInfo;
+
+        /// <summary>Reference to the live TerminalControl for this tab (set by TerminalTabView).</summary>
+        public TerminalControl? TerminalControl { get; set; }
 
 
         /// <summary>

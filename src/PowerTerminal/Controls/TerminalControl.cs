@@ -72,6 +72,16 @@ namespace PowerTerminal.Controls
         private double _charHeight;
         private bool _charSizeMeasured;
 
+        /// <summary>Height of one terminal line in WPF device-independent units.</summary>
+        public double CharHeight
+        {
+            get
+            {
+                if (!_charSizeMeasured) MeasureCharSize();
+                return _charHeight;
+            }
+        }
+
         private static readonly SolidColorBrush TerminalForeground = new(Color.FromRgb(204, 204, 204));
         private static readonly SolidColorBrush TerminalBackground = new(Color.FromRgb(12, 12, 12));
         private static readonly SolidColorBrush TerminalCaret      = new(Color.FromRgb(204, 204, 204));
@@ -1543,6 +1553,29 @@ namespace PowerTerminal.Controls
         }
 
         // ── Dynamic Resize ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Snap the arranged height to a whole number of character lines so that
+        /// no text line is ever half-visible during window resize.
+        /// </summary>
+        protected override Size ArrangeOverride(Size arrangeBounds)
+        {
+            if (!_charSizeMeasured) MeasureCharSize();
+
+            if (_charSizeMeasured && _charHeight > 0)
+            {
+                double vertPad   = Padding.Top + Padding.Bottom;
+                double available = arrangeBounds.Height - vertPad;
+                int    lines     = Math.Max(1, (int)(available / _charHeight));
+                double snapped   = lines * _charHeight + vertPad;
+
+                // Only snap if it meaningfully differs to avoid infinite layout loops
+                if (Math.Abs(snapped - arrangeBounds.Height) > 0.5)
+                    arrangeBounds = new Size(arrangeBounds.Width, snapped);
+            }
+
+            return base.ArrangeOverride(arrangeBounds);
+        }
 
         private void MeasureCharSize()
         {

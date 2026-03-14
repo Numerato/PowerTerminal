@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using PowerTerminal.Controls;
 using PowerTerminal.Models;
 using PowerTerminal.ViewModels;
@@ -154,8 +155,17 @@ namespace PowerTerminal
         }
 
         private const int WM_GETMINMAXINFO  = 0x0024;
+        private const int WM_SIZING         = 0x0214;
         private const int WM_SYSKEYDOWN     = 0x0104;
         private const int VK_F10            = 0x79;
+
+        // WMSZ edges
+        private const int WMSZ_TOP         = 3;
+        private const int WMSZ_TOPLEFT     = 4;
+        private const int WMSZ_TOPRIGHT    = 5;
+        private const int WMSZ_BOTTOM      = 6;
+        private const int WMSZ_BOTTOMLEFT  = 7;
+        private const int WMSZ_BOTTOMRIGHT = 8;
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
@@ -164,14 +174,62 @@ namespace PowerTerminal
                 WmGetMinMaxInfo(hwnd, lParam);
                 handled = true;
             }
+            else if (msg == WM_SIZING)
+            {
+                SnapHeightToLineGrid(wParam, lParam);
+                handled = false; // let WPF continue normally
+            }
             else if (msg == WM_SYSKEYDOWN && wParam.ToInt32() == VK_F10)
             {
-                // F10 sends WM_SYSKEYDOWN which WPF uses to activate the window menu.
-                // Swallow it when the terminal has focus so it reaches OnPreviewKeyDown.
                 if (FocusManager.GetFocusedElement(this) is Controls.TerminalControl)
                     handled = true;
             }
             return IntPtr.Zero;
+        }
+
+        /// <summary>
+        /// During WM_SIZING snap the window height so the terminal always shows
+        /// whole lines — no half-visible bottom row.
+        /// </summary>
+        private void SnapHeightToLineGrid(IntPtr wParam, IntPtr lParam)
+        {
+            double charHeight = GetActiveTerminalCharHeight();
+            if (charHeight <= 1) return;
+
+            // DPI scale from the HwndSource we already have
+            var src = PresentationSource.FromVisual(this);
+            double dpiScale = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+
+            // Chrome overhead in physical pixels:
+            //   title bar (34 WPF) + top margin (6 WPF) + bottom margin (6 WPF) + 1px border × 2
+            double chromeWpf    = 34 + 6 + 6 + 2;
+            double chromePx     = chromeWpf * dpiScale;
+            double lineHeightPx = charHeight * dpiScale;
+
+            var rect    = Marshal.PtrToStructure<RECT>(lParam);
+            int totalPx = rect.bottom - rect.top;
+
+            double contentPx   = totalPx - chromePx;
+            int    lines       = Math.Max(1, (int)Math.Round(contentPx / lineHeightPx));
+            int snappedTotal   = (int)Math.Round(lines * lineHeightPx + chromePx);
+
+            int  edge    = wParam.ToInt32();
+            bool topEdge = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT;
+
+            if (topEdge)
+                rect.top = rect.bottom - snappedTotal;
+            else
+                rect.bottom = rect.top + snappedTotal;
+
+            Marshal.StructureToPtr(rect, lParam, true);
+        }
+
+        /// <summary>Returns the CharHeight of the active TerminalControl, or 0.</summary>
+        private double GetActiveTerminalCharHeight()
+        {
+            if (Vm.ActiveTerminalTab?.TerminalControl is Controls.TerminalControl tc)
+                return tc.CharHeight;
+            return 0;
         }
 
         [StructLayout(LayoutKind.Sequential)]
