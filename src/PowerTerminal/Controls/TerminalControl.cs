@@ -11,7 +11,6 @@ using System.Windows.Media;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
-using System.Text.RegularExpressions;
 
 namespace PowerTerminal.Controls
 {
@@ -198,16 +197,18 @@ namespace PowerTerminal.Controls
 
         // Parsing is lightweight (buffer ops, no document mutation until render).
         // Rendering cost is bounded by terminal dimensions, not input size.
-        private const int MaxCharsPerFrame = 50000;
+        // We drain ALL queued data before rendering so a single AvalonEdit
+        // document update covers the entire burst (critical for "apt list"-sized
+        // output).
 
         private void ProcessQueue()
         {
             try
             {
-                int charsProcessed = 0;
-
-                while ((charsProcessed < MaxCharsPerFrame || _leftoverStr.Length > 0)
-                       && _incomingDataQueue.TryDequeue(out var s))
+                // Drain the entire queue — parsing only mutates the lightweight
+                // Cell[,] buffer, so it's cheap.  The expensive part (AvalonEdit
+                // document rebuild) happens once after ALL pending data is parsed.
+                while (_incomingDataQueue.TryDequeue(out var s))
                 {
                     if (_leftoverStr.Length > 0)
                     {
@@ -215,7 +216,6 @@ namespace PowerTerminal.Controls
                         _leftoverStr = "";
                     }
 
-                    charsProcessed += s.Length;
                     ParseData(s);
                 }
 
@@ -277,6 +277,12 @@ namespace PowerTerminal.Controls
                     {
                         // OSC sequence: ESC ] ... BEL/ST
                         i = ParseOsc(data, i + 2);
+                    }
+                    else if (next == 'P')
+                    {
+                        // DCS (Device Control String): ESC P ... ST
+                        // Used by some programs (tmux, vim, etc.). Skip to terminator.
+                        i = SkipToST(data, i + 2);
                     }
                     else if (next == '(' || next == ')')
                     {
@@ -398,6 +404,24 @@ namespace PowerTerminal.Controls
             }
 
             // Incomplete OSC — save for next chunk
+            _leftoverStr = data.Substring(start - 2);
+            return len;
+        }
+
+        /// <summary>Skip a DCS/APC/PM sequence by scanning to ST (ESC \) or BEL. Returns next index.</summary>
+        private int SkipToST(string data, int start)
+        {
+            int i = start;
+            int len = data.Length;
+            while (i < len)
+            {
+                if (data[i] == '\x1b' && i + 1 < len && data[i + 1] == '\\')
+                    return i + 2; // skip ST
+                if (data[i] == '\x07')
+                    return i + 1; // BEL as alternative terminator
+                i++;
+            }
+            // Incomplete — save for next chunk
             _leftoverStr = data.Substring(start - 2);
             return len;
         }
@@ -933,9 +957,17 @@ namespace PowerTerminal.Controls
 
         // ── Buffer Rendering ─────────────────────────────────────────────────
 
+        // Maximum scrollback lines to include in the AvalonEdit document.
+        // The buffer still stores the full 5 000 lines, but rendering more
+        // than a screenful of history on every update dominates frame time
+        // for fast-scrolling output (e.g. `apt list`).
+        private const int MaxRenderedScrollback = 500;
+
         /// <summary>
         /// Serialize the terminal buffer (scrollback + visible screen) into the
         /// AvalonEdit document and create color segments for styled cells.
+        /// Uses run-length merging so adjacent cells with identical styles
+        /// share a single segment (htop/vim produce long same-style runs).
         /// </summary>
         private void RenderBuffer()
         {
@@ -947,7 +979,8 @@ namespace PowerTerminal.Controls
             if (!_buffer.IsAlternateBuffer)
             {
                 var scrollback = _buffer.Scrollback;
-                for (int i = 0; i < scrollback.Count; i++)
+                int start = Math.Max(0, scrollback.Count - MaxRenderedScrollback);
+                for (int i = start; i < scrollback.Count; i++)
                 {
                     var row = scrollback[i];
                     int lineStart = offset;
@@ -965,13 +998,11 @@ namespace PowerTerminal.Controls
                         char ch = row[c].Character;
                         if (ch == '\0') ch = ' ';
                         sb.Append(ch);
-
-                        if (row[c].Style.IsNonDefault)
-                        {
-                            AddSegment(newSegments, offset, 1, row[c].Style);
-                        }
                         offset++;
                     }
+
+                    // Run-length segments for this scrollback line
+                    AppendRunLengthSegments(newSegments, row, lineStart, lastNonSpace + 1);
 
                     sb.Append('\n');
                     offset++;
@@ -981,30 +1012,23 @@ namespace PowerTerminal.Controls
             // 2. Render visible screen
             if (_buffer.IsAlternateBuffer)
             {
-                // Alternate screen (htop, nano, vim…): render ALL rows exactly so the
-                // document is the same height as the terminal — no scrollbar needed.
+                // Alternate screen (htop, nano, vim…): render FULL-WIDTH rows so
+                // background colours extend to the edge — critical for TUI apps that
+                // paint coloured status bars / separators with spaces.
                 for (int r = 0; r < _buffer.Rows; r++)
                 {
-                    int lastNonSpace = -1;
+                    int lineStart = offset;
                     for (int c = 0; c < _buffer.Cols; c++)
                     {
-                        char ch = _buffer.GetCell(r, c).Character;
-                        if (ch != ' ' && ch != '\0') lastNonSpace = c;
-                    }
-
-                    int renderTo = lastNonSpace;
-                    if (r == _buffer.CursorRow)
-                        renderTo = Math.Max(renderTo, _buffer.CursorCol);
-
-                    for (int c = 0; c <= renderTo; c++)
-                    {
                         var cell = _buffer.GetCell(r, c);
-                        char ch = cell.Character == '\0' ? ' ' : cell.Character;
+                        char ch = cell.Character;
+                        if (ch == '\0') ch = ' ';
                         sb.Append(ch);
-                        if (cell.Style.IsNonDefault)
-                            AddSegment(newSegments, offset, 1, cell.Style);
                         offset++;
                     }
+
+                    // Run-length segments for this screen row (full width)
+                    AppendRunLengthScreenSegments(newSegments, r, lineStart, _buffer.Cols);
 
                     if (r < _buffer.Rows - 1) { sb.Append('\n'); offset++; }
                 }
@@ -1025,11 +1049,14 @@ namespace PowerTerminal.Controls
 
                 for (int r = 0; r <= lastContentRow; r++)
                 {
+                    int lineStart = offset;
                     int lastNonSpace = -1;
                     for (int c = 0; c < _buffer.Cols; c++)
                     {
                         char ch = _buffer.GetCell(r, c).Character;
                         if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                        // Also extend if the cell has a non-default style (e.g. colored background on a space)
+                        if (_buffer.GetCell(r, c).Style.IsNonDefault) lastNonSpace = c;
                     }
 
                     int renderTo = lastNonSpace;
@@ -1041,10 +1068,11 @@ namespace PowerTerminal.Controls
                         var cell = _buffer.GetCell(r, c);
                         char ch = cell.Character == '\0' ? ' ' : cell.Character;
                         sb.Append(ch);
-                        if (cell.Style.IsNonDefault)
-                            AddSegment(newSegments, offset, 1, cell.Style);
                         offset++;
                     }
+
+                    // Run-length segments for this screen row
+                    AppendRunLengthScreenSegments(newSegments, r, lineStart, renderTo + 1);
 
                     if (r < lastContentRow) { sb.Append('\n'); offset++; }
                 }
@@ -1079,16 +1107,142 @@ namespace PowerTerminal.Controls
             PositionCaret();
         }
 
+        /// <summary>
+        /// Append run-length-merged color segments for a scrollback row.
+        /// Adjacent cells with identical resolved styles share one segment.
+        /// </summary>
+        private void AppendRunLengthSegments(List<ColorSegment> segments,
+            TerminalBuffer.Cell[] row, int docOffset, int cellCount)
+        {
+            if (cellCount <= 0) return;
+
+            int runStart = 0;
+            var runStyle = ResolveStyle(row[0].Style);
+
+            for (int c = 1; c < cellCount; c++)
+            {
+                var style = ResolveStyle(row[c].Style);
+                if (!StyleEquals(style, runStyle))
+                {
+                    if (runStyle.HasVisual)
+                        segments.Add(CreateSegment(docOffset + runStart, c - runStart, runStyle));
+                    runStart = c;
+                    runStyle = style;
+                }
+            }
+            // Emit final run
+            if (runStyle.HasVisual)
+                segments.Add(CreateSegment(docOffset + runStart, cellCount - runStart, runStyle));
+        }
+
+        /// <summary>
+        /// Append run-length-merged color segments for a screen row (reads from buffer).
+        /// </summary>
+        private void AppendRunLengthScreenSegments(List<ColorSegment> segments,
+            int bufferRow, int docOffset, int cellCount)
+        {
+            if (cellCount <= 0) return;
+
+            int runStart = 0;
+            var runStyle = ResolveStyle(_buffer.GetCell(bufferRow, 0).Style);
+
+            for (int c = 1; c < cellCount; c++)
+            {
+                var style = ResolveStyle(_buffer.GetCell(bufferRow, c).Style);
+                if (!StyleEquals(style, runStyle))
+                {
+                    if (runStyle.HasVisual)
+                        segments.Add(CreateSegment(docOffset + runStart, c - runStart, runStyle));
+                    runStart = c;
+                    runStyle = style;
+                }
+            }
+            if (runStyle.HasVisual)
+                segments.Add(CreateSegment(docOffset + runStart, cellCount - runStart, runStyle));
+        }
+
+        /// <summary>Resolved style with inverse/hidden already applied.</summary>
+        private readonly struct ResolvedStyle
+        {
+            public readonly Brush? Fg;
+            public readonly Brush? Bg;
+            public readonly bool IsBold;
+            public readonly bool IsDim;
+            public readonly bool IsItalic;
+            public readonly bool IsUnderline;
+            public readonly bool IsStrikethrough;
+            public readonly bool IsBlink;
+            public readonly Brush? UnderlineColor;
+            /// <summary>True when this style differs from default and needs a segment.</summary>
+            public readonly bool HasVisual;
+
+            public ResolvedStyle(Brush? fg, Brush? bg, bool bold, bool dim, bool italic,
+                bool underline, bool strikethrough, bool blink, Brush? underlineColor)
+            {
+                Fg = fg; Bg = bg; IsBold = bold; IsDim = dim; IsItalic = italic;
+                IsUnderline = underline; IsStrikethrough = strikethrough;
+                IsBlink = blink; UnderlineColor = underlineColor;
+                HasVisual = fg != null || bg != null || bold || dim || italic
+                         || underline || strikethrough || blink || underlineColor != null;
+            }
+        }
+
+        private static ResolvedStyle ResolveStyle(TerminalBuffer.CellStyle style)
+        {
+            if (!style.IsNonDefault)
+                return default;
+
+            var fg = style.Foreground;
+            var bg = style.Background;
+            if (style.IsInverse)
+                (fg, bg) = (bg ?? TerminalBackground, fg ?? TerminalForeground);
+            if (style.IsHidden)
+                fg = bg ?? TerminalBackground;
+
+            return new ResolvedStyle(fg, bg,
+                style.IsBold || style.IsBlink, style.IsDim, style.IsItalic,
+                style.IsUnderline, style.IsStrikethrough, style.IsBlink,
+                style.UnderlineColor);
+        }
+
+        private static bool StyleEquals(ResolvedStyle a, ResolvedStyle b)
+        {
+            return a.Fg == b.Fg && a.Bg == b.Bg
+                && a.IsBold == b.IsBold && a.IsDim == b.IsDim
+                && a.IsItalic == b.IsItalic && a.IsUnderline == b.IsUnderline
+                && a.IsStrikethrough == b.IsStrikethrough && a.IsBlink == b.IsBlink
+                && a.UnderlineColor == b.UnderlineColor;
+        }
+
+        private static ColorSegment CreateSegment(int offset, int length, ResolvedStyle s)
+        {
+            return new ColorSegment
+            {
+                StartOffset = offset,
+                Length = length,
+                Foreground = s.Fg,
+                Background = s.Bg,
+                IsBold = s.IsBold,
+                IsDim = s.IsDim,
+                IsItalic = s.IsItalic,
+                IsUnderline = s.IsUnderline,
+                IsStrikethrough = s.IsStrikethrough,
+                IsBlink = s.IsBlink,
+                UnderlineColor = s.UnderlineColor,
+            };
+        }
+
         private void PositionCaret()
         {
-            // Calculate caret offset: count through scrollback + visible rows
+            // Calculate caret offset: count through rendered scrollback + visible rows
             int targetOffset = 0;
 
             if (!_buffer.IsAlternateBuffer)
             {
-                // Skip past scrollback lines
+                // Skip past rendered scrollback lines
                 var scrollback = _buffer.Scrollback;
-                for (int i = 0; i < scrollback.Count; i++)
+                int start = Math.Max(0, scrollback.Count - MaxRenderedScrollback);
+                for (int i = start; i < scrollback.Count; i++)
                 {
                     var row = scrollback[i];
                     int lastNonSpace = -1;
@@ -1103,23 +1257,36 @@ namespace PowerTerminal.Controls
             }
 
             // Walk through screen rows to the cursor row
-            for (int r = 0; r < _buffer.CursorRow; r++)
+            if (_buffer.IsAlternateBuffer)
             {
-                int lastNonSpace = -1;
-                for (int c = 0; c < _buffer.Cols; c++)
+                // Alt buffer renders full-width rows
+                for (int r = 0; r < _buffer.CursorRow; r++)
                 {
-                    char ch = _buffer.GetCell(r, c).Character;
-                    if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                    targetOffset += _buffer.Cols; // full row
+                    targetOffset++; // newline
                 }
-                int renderTo = lastNonSpace;
-                if (r == _buffer.CursorRow)
-                    renderTo = Math.Max(renderTo, _buffer.CursorCol);
-                targetOffset += renderTo + 1; // chars
-                targetOffset++; // newline
+                targetOffset += _buffer.CursorCol;
             }
-
-            // Add cursor column
-            targetOffset += _buffer.CursorCol;
+            else
+            {
+                for (int r = 0; r < _buffer.CursorRow; r++)
+                {
+                    int lastNonSpace = -1;
+                    for (int c = 0; c < _buffer.Cols; c++)
+                    {
+                        char ch = _buffer.GetCell(r, c).Character;
+                        if (ch != ' ' && ch != '\0') lastNonSpace = c;
+                        if (_buffer.GetCell(r, c).Style.IsNonDefault) lastNonSpace = c;
+                    }
+                    int renderTo = lastNonSpace;
+                    if (r == _buffer.CursorRow)
+                        renderTo = Math.Max(renderTo, _buffer.CursorCol);
+                    targetOffset += renderTo + 1; // chars
+                    targetOffset++; // newline
+                }
+                // Add cursor column
+                targetOffset += _buffer.CursorCol;
+            }
 
             targetOffset = Math.Clamp(targetOffset, 0, Document.TextLength);
 
@@ -1157,41 +1324,6 @@ namespace PowerTerminal.Controls
             }
             // Fallback: set the attached property (works if the template reads it)
             ScrollViewer.SetVerticalScrollBarVisibility(this, visibility);
-        }
-
-        private static void AddSegment(List<ColorSegment> segments, int offset, int length,
-            TerminalBuffer.CellStyle style)
-        {
-            var fg = style.Foreground;
-            var bg = style.Background;
-
-            // Handle inverse (swap FG and BG)
-            if (style.IsInverse)
-            {
-                (fg, bg) = (bg ?? TerminalBackground, fg ?? TerminalForeground);
-            }
-
-            // Handle hidden text: set foreground = background
-            if (style.IsHidden)
-            {
-                fg = bg ?? TerminalBackground;
-            }
-
-            segments.Add(new ColorSegment
-            {
-                StartOffset = offset,
-                Length = length,
-                Foreground = fg,
-                Background = bg,
-                IsBold = style.IsBold || style.IsBlink, // Map blink to bold for visual effect
-                IsDim = style.IsDim,
-                IsItalic = style.IsItalic,
-                IsUnderline = style.IsUnderline,
-                IsStrikethrough = style.IsStrikethrough,
-                IsBlink = style.IsBlink,
-                IsHidden = style.IsHidden,
-                UnderlineColor = style.UnderlineColor,
-            });
         }
 
         // ── Param helpers ────────────────────────────────────────────────────
@@ -1374,7 +1506,6 @@ namespace PowerTerminal.Controls
             public bool IsUnderline;
             public bool IsStrikethrough;
             public bool IsBlink;
-            public bool IsHidden;
             public Brush? UnderlineColor;
         }
 

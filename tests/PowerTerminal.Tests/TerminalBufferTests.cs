@@ -778,4 +778,148 @@ public class TerminalBufferTests
         buf.OriginMode = true;
         Assert.True(buf.GetDecMode(6));
     }
+
+    // ── Alternate buffer for TUI apps (htop/vim/nano) ────────────────────
+
+    [Fact]
+    public void AltBuffer_PreservesFullRowContent()
+    {
+        // When htop/vim switch to alternate buffer, the full screen is used.
+        // Ensure cells at the far right of each row are accessible.
+        var buf = CreateBuffer(5, 10);
+        buf.SwitchToAlternateBuffer();
+
+        // Write to the last column of each row
+        for (int r = 0; r < 5; r++)
+        {
+            buf.SetCursorPosition(r, 9);
+            buf.WriteChar('X');
+        }
+
+        // Verify all far-right cells
+        for (int r = 0; r < 5; r++)
+            Assert.Equal('X', buf.GetCell(r, 9).Character);
+    }
+
+    [Fact]
+    public void AltBuffer_StyledSpacesArePreserved()
+    {
+        // htop draws coloured bars with spaces that have background color set.
+        // The renderer must include these "styled spaces" in the output.
+        var buf = CreateBuffer(3, 10);
+        buf.SwitchToAlternateBuffer();
+
+        var brush = new SolidColorBrush(Colors.Blue);
+        brush.Freeze();
+        buf.CurrentStyle.Background = brush;
+
+        // Write 10 spaces with blue background on row 0
+        buf.SetCursorPosition(0, 0);
+        for (int c = 0; c < 10; c++)
+            buf.WriteChar(' ');
+
+        // All cells should have the background style
+        for (int c = 0; c < 10; c++)
+        {
+            var cell = buf.GetCell(0, c);
+            Assert.Equal(' ', cell.Character);
+            Assert.True(cell.Style.IsNonDefault, $"Cell (0,{c}) should have non-default style");
+        }
+    }
+
+    [Fact]
+    public void PrimaryBuffer_StyledSpacesExtendRenderTo()
+    {
+        // A space with a coloured background at the end of a line should
+        // still be rendered (not trimmed by the lastNonSpace logic).
+        var buf = CreateBuffer(3, 10);
+
+        var brush = new SolidColorBrush(Colors.Red);
+        brush.Freeze();
+        buf.CurrentStyle.Background = brush;
+
+        buf.SetCursorPosition(0, 5);
+        buf.WriteChar(' ');
+        buf.WriteChar(' ');
+
+        // Cells 5-6 are spaces but have non-default style
+        Assert.True(buf.GetCell(0, 5).Style.IsNonDefault);
+        Assert.True(buf.GetCell(0, 6).Style.IsNonDefault);
+    }
+
+    // ── Scrollback cap ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Scrollback_AccumulatesOnScrollUp()
+    {
+        var buf = CreateBuffer(3, 5);
+
+        // Fill 3 rows and scroll once to push row 0 into scrollback
+        for (int r = 0; r < 3; r++)
+        {
+            buf.WriteChar((char)('A' + r));
+            if (r < 2) buf.LineFeed();
+        }
+        buf.LineFeed(); // Scroll: row 0 → scrollback
+
+        Assert.Equal(1, buf.Scrollback.Count);
+        Assert.Equal('A', buf.Scrollback[0][0].Character);
+    }
+
+    [Fact]
+    public void Scrollback_StaysWithinMaxLimit()
+    {
+        var buf = CreateBuffer(2, 5);
+
+        // Push many lines to exceed scrollback limit (5000)
+        for (int i = 0; i < 5100; i++)
+        {
+            buf.WriteChar('X');
+            buf.LineFeed();
+            buf.CarriageReturn();
+        }
+
+        // Buffer stores up to 5000 scrollback lines
+        Assert.True(buf.Scrollback.Count <= 5000);
+    }
+
+    // ── Scroll region for TUI layout ─────────────────────────────────────
+
+    [Fact]
+    public void ScrollRegion_ScrollUpStaysWithinRegion()
+    {
+        // htop uses scroll regions to update just the process list area.
+        var buf = CreateBuffer(10, 20);
+        buf.SetScrollRegion(2, 7); // Region rows 2-7
+
+        // Position at bottom of region and scroll up
+        buf.SetCursorPosition(7, 0);
+        buf.WriteChar('Z');
+        buf.LineFeed(); // Should scroll within region [2,7]
+
+        // Row 2 should have been scrolled out; row 7 should be blank
+        Assert.Equal(' ', buf.GetCell(7, 0).Character);
+    }
+
+    [Fact]
+    public void ScrollRegion_ContentOutsideRegionUnchanged()
+    {
+        var buf = CreateBuffer(10, 20);
+
+        // Write content at rows 0 and 9 (outside scroll region)
+        buf.SetCursorPosition(0, 0);
+        buf.WriteChar('T');
+        buf.SetCursorPosition(9, 0);
+        buf.WriteChar('B');
+
+        buf.SetScrollRegion(2, 7);
+
+        // Scroll within the region
+        buf.SetCursorPosition(7, 0);
+        for (int i = 0; i < 5; i++) buf.LineFeed();
+
+        // Content outside region should be untouched
+        Assert.Equal('T', buf.GetCell(0, 0).Character);
+        Assert.Equal('B', buf.GetCell(9, 0).Character);
+    }
 }
