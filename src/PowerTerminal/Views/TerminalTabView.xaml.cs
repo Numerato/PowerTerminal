@@ -56,15 +56,9 @@ namespace PowerTerminal.Views
                 Terminal.CancelHiddenInput();
             }
 
-            // Unregister terminal control reference from old VM
-            if (_vm != null)
-                _vm.TerminalControl = null;
-
             _vm = DataContext as TerminalTabViewModel;
             if (_vm != null)
             {
-                // Register this view's terminal control so MainWindow can read CharHeight
-                _vm.TerminalControl = Terminal;
                 _vm.TerminalDataReceived += OnTerminalData;
                 _vm.LocalOutput          += OnTerminalData;
                 _vm.ClearRequested       += OnClearRequested;

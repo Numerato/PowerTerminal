@@ -1,7 +1,9 @@
 <UserControl x:Class="PowerTerminal.Views.AiChatView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:models="clr-namespace:PowerTerminal.Models">
+             xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
+             xmlns:models="clr-namespace:PowerTerminal.Models"
+             Background="{StaticResource SurfaceBrush}">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -22,7 +24,8 @@
         <ScrollViewer Grid.Row="1"
                       x:Name="MessagesScroller"
                       VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
+                      HorizontalScrollBarVisibility="Disabled"
+                      Background="{StaticResource BackgroundBrush}">
             <ItemsControl x:Name="MessagesList"
                           ItemsSource="{Binding Messages}"
                           Padding="8,8">

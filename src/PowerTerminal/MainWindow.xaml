@@ -35,11 +35,10 @@
       </Grid.RowDefinitions>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="44" />
       </Grid.ColumnDefinitions>
 
       <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
-      <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+      <Border Grid.Row="0" Grid.Column="0"
               BorderThickness="0"
               CornerRadius="7,7,0,0"
               Background="{StaticResource TitleBarBrush}">
@@ -48,8 +47,6 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
-            <!-- Reserve space for the sidebar strip so X sits to its left -->
-            <ColumnDefinition Width="44" />
           </Grid.ColumnDefinitions>
 
           <!-- Logo: image + app name -->
@@ -312,13 +309,15 @@
           <ColumnDefinition Width="Auto" />
           <!-- Right panel — width managed from code-behind (0 when closed, 30% when open) -->
           <ColumnDefinition x:Name="PanelColumn" Width="0" MinWidth="0" />
+          <!-- Right activity sidebar -->
+          <ColumnDefinition Width="44" />
         </Grid.ColumnDefinitions>
 
         <!-- ── Terminal area ── -->
         <Border Grid.Column="0"
                 CornerRadius="8"
                 Background="{StaticResource PanelBrush}"
-                Margin="6"
+                Margin="6,6,0,6"
                 ClipToBounds="True">
           <Grid>
           <!-- Welcome placeholder -->
@@ -366,7 +365,7 @@
 
         <!-- ── Splitter ── -->
         <GridSplitter Grid.Column="1"
-                      Width="4"
+                      Width="6"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
                       ResizeBehavior="PreviousAndNext"
@@ -375,7 +374,7 @@
         <!-- ── Right panel (Wiki / AI Chat / Explorer / Settings) ── -->
         <Border Grid.Column="2"
                 CornerRadius="8"
-                Margin="6"
+                Margin="0,6,6,6"
                 ClipToBounds="True"
                 Background="{StaticResource SurfaceBrush}">
           <Grid>
@@ -389,37 +388,11 @@
                               Visibility="{Binding DataContext.AiChatPanelActive,
                                            RelativeSource={RelativeSource AncestorType=Window},
                                            Converter={StaticResource BoolToVisConverter}}"/>
-            <!-- Explorer placeholder -->
-            <Grid Visibility="{Binding DataContext.ExplorerPanelActive,
-                                RelativeSource={RelativeSource AncestorType=Window},
-                                Converter={StaticResource BoolToVisConverter}}">
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-              </Grid.RowDefinitions>
-              <Border Grid.Row="0"
-                      BorderBrush="{StaticResource BorderBrush}"
-                      BorderThickness="0,0,0,1"
-                      Padding="16,10">
-                <TextBlock Text="Explorer"
-                           FontSize="14" FontWeight="SemiBold"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-              </Border>
-              <StackPanel Grid.Row="1"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center">
-                <TextBlock Text="&#xE8B7;"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="40"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,12"/>
-                <TextBlock Text="Coming soon"
-                           FontSize="13"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           HorizontalAlignment="Center"/>
-              </StackPanel>
-            </Grid>
+            <!-- Explorer panel -->
+            <views:ExplorerView
+                        Visibility="{Binding DataContext.ExplorerPanelActive,
+                                     RelativeSource={RelativeSource AncestorType=Window},
+                                     Converter={StaticResource BoolToVisConverter}}"/>
             <!-- Settings panel -->
             <views:SettingsPanelView
                         Visibility="{Binding DataContext.SettingsPanelActive,
@@ -429,72 +402,70 @@
         </Border>
 
         <!-- ── Right activity sidebar ── -->
+        <Border Grid.Column="3" Padding="0,10,0,0"
+                Background="{StaticResource TitleBarBrush}"
+                BorderThickness="0">
+          <StackPanel VerticalAlignment="Top">
+
+            <!-- Wiki -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding WikiPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="wiki"
+                          ToolTip="Wiki"
+                          Margin="0,0,0,6"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE736;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- AI Chat -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding AiChatPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="aichat"
+                          ToolTip="AI Chat"
+                          Margin="0,0,0,6"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE8BD;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- Explorer -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding ExplorerPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="explorer"
+                          ToolTip="Explorer"
+                          Margin="0,0,0,6"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xEC50;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+            <!-- Settings -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding SettingsPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="settings"
+                          ToolTip="Settings"
+                          Margin="0,0,0,6"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE713;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
+          </StackPanel>
+        </Border>
       </Grid>
-
-      <!-- ── Right activity sidebar — spans full height (title bar + content) ── -->
-      <Border Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
-              Background="{StaticResource TitleBarBrush}"
-              BorderThickness="0">
-        <StackPanel VerticalAlignment="Top"
-                    Margin="0,0,0,0">
-
-          <!-- Spacer: title bar height (34) + panel top gap (6) -->
-          <Border Height="40"/>
-
-          <!-- Wiki -->
-          <ToggleButton Style="{StaticResource SidebarButton}"
-                        IsChecked="{Binding WikiPanelActive, Mode=OneWay}"
-                        Command="{Binding TogglePanelCommand}"
-                        CommandParameter="wiki"
-                        ToolTip="Wiki"
-                        ToolTipService.InitialShowDelay="0">
-            <TextBlock Text="&#xE736;"
-                       FontFamily="Segoe MDL2 Assets"
-                       FontSize="14"
-                       Foreground="White"/>
-          </ToggleButton>
-
-          <!-- AI Chat -->
-          <ToggleButton Style="{StaticResource SidebarButton}"
-                        IsChecked="{Binding AiChatPanelActive, Mode=OneWay}"
-                        Command="{Binding TogglePanelCommand}"
-                        CommandParameter="aichat"
-                        ToolTip="AI Chat"
-                        ToolTipService.InitialShowDelay="0">
-            <TextBlock Text="&#xE8BD;"
-                       FontFamily="Segoe MDL2 Assets"
-                       FontSize="14"
-                       Foreground="White"/>
-          </ToggleButton>
-
-          <!-- Explorer -->
-          <ToggleButton Style="{StaticResource SidebarButton}"
-                        IsChecked="{Binding ExplorerPanelActive, Mode=OneWay}"
-                        Command="{Binding TogglePanelCommand}"
-                        CommandParameter="explorer"
-                        ToolTip="Explorer"
-                        ToolTipService.InitialShowDelay="0">
-            <TextBlock Text="&#xEC50;"
-                       FontFamily="Segoe MDL2 Assets"
-                       FontSize="14"
-                       Foreground="White"/>
-          </ToggleButton>
-
-          <!-- Settings -->
-          <ToggleButton Style="{StaticResource SidebarButton}"
-                        IsChecked="{Binding SettingsPanelActive, Mode=OneWay}"
-                        Command="{Binding TogglePanelCommand}"
-                        CommandParameter="settings"
-                        ToolTip="Settings"
-                        ToolTipService.InitialShowDelay="0">
-            <TextBlock Text="&#xE713;"
-                       FontFamily="Segoe MDL2 Assets"
-                       FontSize="14"
-                       Foreground="White"/>
-          </ToggleButton>
-
-        </StackPanel>
-      </Border>
     </Grid>
   </Border>
 </Window>

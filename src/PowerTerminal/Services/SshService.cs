@@ -273,13 +273,7 @@ namespace PowerTerminal.Services
                         // channel receive-window is extended immediately after each chunk
                         // is consumed — preventing server-side write() stalls (apt list).
                         int read = await stream.ReadAsync(buffer, 0, buffer.Length, token);
-                        if (read <= 0)
-                        {
-                            // Clean EOF — the remote shell exited (e.g. user typed "exit").
-                            if (!token.IsCancellationRequested)
-                                Disconnected?.Invoke(null);
-                            break;
-                        }
+                        if (read <= 0) break;
 
                         string data = Encoding.UTF8.GetString(buffer, 0, read);
 

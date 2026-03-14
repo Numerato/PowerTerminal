@@ -6,6 +6,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Panel header -->
@@ -149,15 +150,20 @@
                           Foreground="{StaticResource ForegroundBrush}"
                           Margin="0,0,0,16"/>
 
-                <Button Content="Save Settings"
-                        Style="{StaticResource AccentButton}"
-                        HorizontalAlignment="Right"
-                        MinWidth="110"
-                        Margin="0,0,0,8"
-                        Click="Save_Click"/>
-
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Save button -->
+        <Border Grid.Row="2"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,10">
+            <Button Content="Save Settings"
+                    Style="{StaticResource AccentButton}"
+                    HorizontalAlignment="Right"
+                    MinWidth="110"
+                    Click="Save_Click"/>
+        </Border>
     </Grid>
 </UserControl>
 

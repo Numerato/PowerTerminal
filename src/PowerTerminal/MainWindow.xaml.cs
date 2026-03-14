@@ -193,27 +193,28 @@ namespace PowerTerminal
         /// </summary>
         private void SnapHeightToLineGrid(IntPtr wParam, IntPtr lParam)
         {
+            // Find the active terminal control to read its char height
             double charHeight = GetActiveTerminalCharHeight();
             if (charHeight <= 1) return;
 
-            // DPI scale from the HwndSource we already have
-            var src = PresentationSource.FromVisual(this);
-            double dpiScale = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double dpiScale = dpi.DpiScaleY;
 
             // Chrome overhead in physical pixels:
             //   title bar (34 WPF) + top margin (6 WPF) + bottom margin (6 WPF) + 1px border × 2
-            double chromeWpf    = 34 + 6 + 6 + 2;
-            double chromePx     = chromeWpf * dpiScale;
+            double chromeWpf = 34 + 6 + 6 + 2;
+            double chromePx  = chromeWpf * dpiScale;
             double lineHeightPx = charHeight * dpiScale;
 
-            var rect    = Marshal.PtrToStructure<RECT>(lParam);
+            var rect = Marshal.PtrToStructure<RECT>(lParam);
             int totalPx = rect.bottom - rect.top;
 
-            double contentPx   = totalPx - chromePx;
-            int    lines       = Math.Max(1, (int)Math.Round(contentPx / lineHeightPx));
-            int snappedTotal   = (int)Math.Round(lines * lineHeightPx + chromePx);
+            // How many whole lines fit in the content area?
+            double contentPx = totalPx - chromePx;
+            int lines = Math.Max(1, (int)Math.Round(contentPx / lineHeightPx));
+            int snappedTotal = (int)Math.Round(lines * lineHeightPx + chromePx);
 
-            int  edge    = wParam.ToInt32();
+            int edge = wParam.ToInt32();
             bool topEdge = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT;
 
             if (topEdge)
@@ -224,11 +225,27 @@ namespace PowerTerminal
             Marshal.StructureToPtr(rect, lParam, true);
         }
 
-        /// <summary>Returns the CharHeight of the active TerminalControl, or 0.</summary>
+        /// <summary>Returns the _charHeight of the first visible TerminalControl, or 0.</summary>
         private double GetActiveTerminalCharHeight()
         {
-            if (Vm.ActiveTerminalTab?.TerminalControl is Controls.TerminalControl tc)
-                return tc.CharHeight;
+            var tab = Vm.ActiveTerminalTab;
+            if (tab == null) return 0;
+
+            // Walk the visual tree from the window to find a TerminalControl
+            return FindTerminalCharHeight(this);
+        }
+
+        private static double FindTerminalCharHeight(DependencyObject parent)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is Controls.TerminalControl tc)
+                    return tc.CharHeight;
+                double found = FindTerminalCharHeight(child);
+                if (found > 0) return found;
+            }
             return 0;
         }
 
