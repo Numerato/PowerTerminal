@@ -68,13 +68,13 @@ namespace PowerTerminal.ViewModels
         public string Title
         {
             get => _entry.Title;
-            set { _entry.Title = value; OnPropertyChanged(); }
+            set { if (_entry.Title != value) { _entry.Title = value; OnPropertyChanged(); } }
         }
 
         public string Description
         {
             get => _entry.Description;
-            set { _entry.Description = value; OnPropertyChanged(); }
+            set { if (_entry.Description != value) { _entry.Description = value; OnPropertyChanged(); } }
         }
 
         private string _tags = string.Empty;

@@ -47,9 +47,6 @@ namespace PowerTerminal.ViewModels
 
             // Load connections and open default tab
             LoadDefaultTabs();
-
-            // Apply initial settings to services
-            RefreshSettings();
         }
 
         public void RefreshSettings()

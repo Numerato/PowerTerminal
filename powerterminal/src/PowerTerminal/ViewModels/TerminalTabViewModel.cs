@@ -12,7 +12,7 @@ namespace PowerTerminal.ViewModels
     public class TerminalTabViewModel : ViewModelBase, IDisposable
     {
         private readonly LoggingService _log;
-        internal SshService? _ssh;
+        private SshService? _ssh;
         private string _header = "Terminal";
         private bool _isActive;
         private bool _isConnected;

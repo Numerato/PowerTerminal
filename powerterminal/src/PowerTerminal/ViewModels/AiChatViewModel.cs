@@ -50,6 +50,12 @@ namespace PowerTerminal.ViewModels
             if (string.IsNullOrWhiteSpace(text)) return;
 
             InputText = string.Empty;
+
+            // Snapshot history BEFORE adding the new user message so AiService
+            // doesn't iterate a list that already contains it and then append it
+            // a second time (which would duplicate the last user turn in the API call).
+            var history = Messages.ToList();
+
             var userMsg = new AiMessage { Role = "user", Content = text };
             Messages.Add(userMsg);
             MessagesChanged?.Invoke();
@@ -58,7 +64,7 @@ namespace PowerTerminal.ViewModels
             _cts = new CancellationTokenSource();
             try
             {
-                string reply = await _ai.ChatAsync(Messages, text, _cts.Token);
+                string reply = await _ai.ChatAsync(history, text, _cts.Token);
                 Messages.Add(new AiMessage { Role = "assistant", Content = reply });
                 MessagesChanged?.Invoke();
             }

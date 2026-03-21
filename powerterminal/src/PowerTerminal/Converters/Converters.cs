@@ -9,6 +9,17 @@ using PowerTerminal.Models;
 
 namespace PowerTerminal.Converters
 {
+    // Shared helper — creates a frozen (immutable, cross-thread) SolidColorBrush.
+    internal static class BrushHelper
+    {
+        internal static SolidColorBrush Freeze(Color c)
+        {
+            var b = new SolidColorBrush(c);
+            b.Freeze();
+            return b;
+        }
+    }
+
     /// <summary>bool → Visibility (true = Visible)</summary>
     public class BoolToVisibilityConverter : IValueConverter
     {
@@ -30,10 +41,11 @@ namespace PowerTerminal.Converters
     /// <summary>bool → connected/disconnected colour brush</summary>
     public class BoolToColorBrushConverter : IValueConverter
     {
+        private static readonly SolidColorBrush Connected    = BrushHelper.Freeze(Color.FromRgb(22,  198,  12));
+        private static readonly SolidColorBrush Disconnected = BrushHelper.Freeze(Color.FromRgb(200,  50,  50));
+
         public object Convert(object value, Type t, object p, CultureInfo c)
-            => value is true
-                ? new SolidColorBrush(Color.FromRgb(22, 198, 12))   // green
-                : new SolidColorBrush(Color.FromRgb(200, 50, 50));   // red
+            => value is true ? Connected : Disconnected;
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();
     }
@@ -143,12 +155,16 @@ namespace PowerTerminal.Converters
     /// <summary>AI message role → background brush</summary>
     public class RoleToBackgroundConverter : IValueConverter
     {
+        private static readonly SolidColorBrush UserBg      = BrushHelper.Freeze(Color.FromRgb(30,  45,  60));
+        private static readonly SolidColorBrush AssistantBg = BrushHelper.Freeze(Color.FromRgb(28,  28,  34));
+        private static readonly SolidColorBrush DefaultBg   = BrushHelper.Freeze(Color.FromRgb(40,  40,  40));
+
         public object Convert(object value, Type t, object p, CultureInfo c) =>
             (value as string) switch
             {
-                "user"      => new SolidColorBrush(Color.FromRgb(30, 45, 60)),
-                "assistant" => new SolidColorBrush(Color.FromRgb(28, 28, 34)),
-                _           => new SolidColorBrush(Color.FromRgb(40, 40, 40))
+                "user"      => UserBg,
+                "assistant" => AssistantBg,
+                _           => DefaultBg
             };
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();
@@ -157,12 +173,15 @@ namespace PowerTerminal.Converters
     /// <summary>AI message role → foreground brush</summary>
     public class RoleToForegroundConverter : IValueConverter
     {
+        private static readonly SolidColorBrush UserFg      = BrushHelper.Freeze(Color.FromRgb(232, 135,  34));
+        private static readonly SolidColorBrush AssistantFg = BrushHelper.Freeze(Color.FromRgb(0,   183, 120));
+
         public object Convert(object value, Type t, object p, CultureInfo c) =>
             (value as string) switch
             {
-                "user"      => new SolidColorBrush(Color.FromRgb(232, 135, 34)),
-                "assistant" => new SolidColorBrush(Color.FromRgb(0, 183, 120)),
-                _           => new SolidColorBrush(Colors.Gray)
+                "user"      => UserFg,
+                "assistant" => AssistantFg,
+                _           => (object)Brushes.Gray
             };
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();
@@ -186,11 +205,12 @@ namespace PowerTerminal.Converters
     /// <summary>WikiSectionType → colour for section type badge</summary>
     public class SectionTypeToColorConverter : IValueConverter
     {
+        private static readonly SolidColorBrush CommandColor = BrushHelper.Freeze(Color.FromRgb(232, 119, 34));
+        private static readonly SolidColorBrush TextColor    = BrushHelper.Freeze(Color.FromRgb( 60, 120, 60));
+
         public object Convert(object value, Type t, object p, CultureInfo c) =>
             value is WikiSectionType type
-                ? type == WikiSectionType.Command
-                    ? new SolidColorBrush(Color.FromRgb(232, 119, 34))
-                    : new SolidColorBrush(Color.FromRgb(60, 120, 60))
+                ? type == WikiSectionType.Command ? CommandColor : TextColor
                 : (object)Brushes.Gray;
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();

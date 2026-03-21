@@ -97,6 +97,8 @@ namespace PowerTerminal.Services
                     }
                 }
 
+                bool connected = false;
+
                 if (pkAuth != null)
                 {
                     var connInfo = new ConnectionInfo(host, port, username, pkAuth);
@@ -111,7 +113,7 @@ namespace PowerTerminal.Services
                     try
                     {
                         _client.Connect();
-                        goto Connected;
+                        connected = true;
                     }
                     catch (SshAuthenticationException)
                     {
@@ -120,57 +122,59 @@ namespace PowerTerminal.Services
                     }
                 }
 
-                // Phase B: password with up to 3 attempts
-                const int MaxAttempts = 3;
-                string? deniedPrefix = null;
-                for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+                // Phase B: password with up to 3 attempts (skipped when key auth succeeded)
+                if (!connected)
                 {
-                    string promptText = (deniedPrefix != null ? deniedPrefix + "\r\n" : "")
-                                        + $"{username}@{host.ToLowerInvariant()}'s password: ";
-                    string password = await promptForPassword(promptText, ct);
-                    if (string.IsNullOrEmpty(password))
-                        throw new OperationCanceledException("Password entry cancelled.");
-
-                    var pwdAuth  = new PasswordAuthenticationMethod(username, password);
-                    var kbAuth   = new KeyboardInteractiveAuthenticationMethod(username);
-                    kbAuth.AuthenticationPrompt += (_, args) =>
+                    const int MaxAttempts = 3;
+                    string? deniedPrefix = null;
+                    for (int attempt = 1; attempt <= MaxAttempts; attempt++)
                     {
-                        foreach (var p in args.Prompts) p.Response = password;
-                    };
+                        string promptText = (deniedPrefix != null ? deniedPrefix + "\r\n" : "")
+                                            + $"{username}@{host.ToLowerInvariant()}'s password: ";
+                        string password = await promptForPassword(promptText, ct);
+                        if (string.IsNullOrEmpty(password))
+                            throw new OperationCanceledException("Password entry cancelled.");
 
-                    var connInfo = new ConnectionInfo(host, port, username, pwdAuth, kbAuth)
-                    {
-                        Timeout = TimeSpan.FromSeconds(10)
-                    };
+                        var pwdAuth  = new PasswordAuthenticationMethod(username, password);
+                        var kbAuth   = new KeyboardInteractiveAuthenticationMethod(username);
+                        kbAuth.AuthenticationPrompt += (_, args) =>
+                        {
+                            foreach (var p in args.Prompts) p.Response = password;
+                        };
 
-                    try { _client?.Disconnect(); } catch { }
-                    try { _client?.Dispose();    } catch { }
-                    _client = new SshClient(connInfo);
-                    _client.ErrorOccurred += (_, e) =>
-                    {
-                        _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
-                        ErrorOccurred?.Invoke(this, e.Exception?.Message ?? "Unknown error");
-                        Disconnected?.Invoke(this, EventArgs.Empty);
-                    };
+                        var connInfo = new ConnectionInfo(host, port, username, pwdAuth, kbAuth)
+                        {
+                            Timeout = TimeSpan.FromSeconds(10)
+                        };
 
-                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                    using var linked     = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+                        try { _client?.Disconnect(); } catch { }
+                        try { _client?.Dispose();    } catch { }
+                        _client = new SshClient(connInfo);
+                        _client.ErrorOccurred += (_, e) =>
+                        {
+                            _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
+                            ErrorOccurred?.Invoke(this, e.Exception?.Message ?? "Unknown error");
+                            Disconnected?.Invoke(this, EventArgs.Empty);
+                        };
 
-                    try
-                    {
-                        await Task.Run(() => _client.Connect(), linked.Token);
-                        if (_client.IsConnected) break;
-                        deniedPrefix = "Permission denied, please try again.";
-                    }
-                    catch (SshAuthenticationException)
-                    {
-                        deniedPrefix = "Permission denied, please try again.";
-                        if (attempt == MaxAttempts)
-                            throw new SshAuthenticationException("Too many authentication failures.");
+                        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                        using var linked     = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+                        try
+                        {
+                            await Task.Run(() => _client.Connect(), linked.Token);
+                            if (_client.IsConnected) break;
+                            deniedPrefix = "Permission denied, please try again.";
+                        }
+                        catch (SshAuthenticationException)
+                        {
+                            deniedPrefix = "Permission denied, please try again.";
+                            if (attempt == MaxAttempts)
+                                throw new SshAuthenticationException("Too many authentication failures.");
+                        }
                     }
                 }
 
-                Connected:
                 var termModes = new Dictionary<TerminalModes, uint>
                 {
                     [TerminalModes.ECHO]  = 1,
@@ -207,8 +211,8 @@ namespace PowerTerminal.Services
 
         public void Send(string text) => Send(Encoding.UTF8.GetBytes(text));
 
-        /// <summary>Legacy string-based send (kept for internal use).</summary>
-        public void SendData(string data) => Send(data);
+        /// <summary>Legacy alias for Send(string) — kept for internal callers only.</summary>
+        internal void SendData(string data) => Send(data);
 
         public void SendCursorPositionReport(int row, int col)
             => Send($"\x1b[{row + 1};{col + 1}R");
@@ -289,36 +293,40 @@ namespace PowerTerminal.Services
         private async Task GatherMachineInfoAsync()
         {
             if (_client == null || !IsConnected) return;
-            MachineInfo = new MachineInfo();
-            await Task.Run(() =>
-            {
-                MachineInfo.Hostname         = RunCommand("hostname").Trim();
-                MachineInfo.OperatingSystem  = RunCommand("uname -o 2>/dev/null || uname -s").Trim();
-                MachineInfo.OsVersion        = RunCommand("cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'").Trim();
-                MachineInfo.KernelVersion    = RunCommand("uname -r").Trim();
-                MachineInfo.HomeFolder       = RunCommand("echo $HOME").Trim();
-                MachineInfo.CurrentDirectory = RunCommand("pwd").Trim();
-                MachineInfo.Hardware         = RunCommand("uname -m").Trim();
-                MachineInfo.CpuInfo          = RunCommand("grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2").Trim();
-                MachineInfo.TotalMemory      = RunCommand("free -h 2>/dev/null | awk '/^Mem:/{print $2}'").Trim();
-                MachineInfo.DiskSizes        = RunCommand("df -h --total 2>/dev/null | tail -1 | awk '{print $2}'").Trim();
-                MachineInfo.IpAddress        = RunCommand("hostname -I 2>/dev/null | awk '{print $1}'").Trim();
-                MachineInfo.Uptime           = RunCommand("uptime -p 2>/dev/null || uptime").Trim();
-                MachineInfo.Username         = RunCommand("whoami").Trim();
-                MachineInfo.LastUpdated      = DateTime.Now;
-            });
+            var info = new MachineInfo();
+
+            // Run all probe commands in parallel — SSH multiplexes channels fine.
+            // Each task writes to a distinct property so no locking is needed.
+            await Task.WhenAll(
+                Task.Run(() => { info.Hostname        = RunCommand("hostname").Trim(); }),
+                Task.Run(() => { info.OperatingSystem = RunCommand("uname -o 2>/dev/null || uname -s").Trim(); }),
+                Task.Run(() => { info.OsVersion       = RunCommand("cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'").Trim(); }),
+                Task.Run(() => { info.KernelVersion   = RunCommand("uname -r").Trim(); }),
+                Task.Run(() => { info.HomeFolder      = RunCommand("echo $HOME").Trim(); }),
+                Task.Run(() => { info.CurrentDirectory = RunCommand("pwd").Trim(); }),
+                Task.Run(() => { info.Hardware        = RunCommand("uname -m").Trim(); }),
+                Task.Run(() => { info.CpuInfo         = RunCommand("grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2").Trim(); }),
+                Task.Run(() => { info.TotalMemory     = RunCommand("free -h 2>/dev/null | awk '/^Mem:/{print $2}'").Trim(); }),
+                Task.Run(() => { info.DiskSizes       = RunCommand("df -h --total 2>/dev/null | tail -1 | awk '{print $2}'").Trim(); }),
+                Task.Run(() => { info.IpAddress       = RunCommand("hostname -I 2>/dev/null | awk '{print $1}'").Trim(); }),
+                Task.Run(() => { info.Uptime          = RunCommand("uptime -p 2>/dev/null || uptime").Trim(); }),
+                Task.Run(() => { info.Username        = RunCommand("whoami").Trim(); })
+            );
+
+            info.LastUpdated = DateTime.Now;
+            MachineInfo = info;
         }
 
         public async Task RefreshMachineInfoAsync()
         {
             if (_client == null || !IsConnected) return;
-            await Task.Run(() =>
-            {
-                if (MachineInfo == null) MachineInfo = new MachineInfo();
-                MachineInfo.CurrentDirectory = RunCommand("pwd").Trim();
-                MachineInfo.DiskSizes        = RunCommand("df -h --total 2>/dev/null | tail -1 | awk '{print $2}'").Trim();
-                MachineInfo.LastUpdated      = DateTime.Now;
-            });
+            var info = MachineInfo ?? new MachineInfo();
+            await Task.WhenAll(
+                Task.Run(() => { info.CurrentDirectory = RunCommand("pwd").Trim(); }),
+                Task.Run(() => { info.DiskSizes        = RunCommand("df -h --total 2>/dev/null | tail -1 | awk '{print $2}'").Trim(); })
+            );
+            info.LastUpdated = DateTime.Now;
+            MachineInfo = info;
         }
 
         private string RunCommand(string cmd)
@@ -350,31 +358,11 @@ namespace PowerTerminal.Services
                 catch { return false; }
             }
 
+            // 1. Key file named after the host (e.g. ~/.ssh/myserver)
             var byHost = Path.Combine(SshKeysFolder, host);
             if (IsPrivateKey(byHost)) return byHost;
 
-            var knownHosts = Path.Combine(SshKeysFolder, "known_hosts");
-            if (File.Exists(knownHosts))
-            {
-                foreach (var line in File.ReadLines(knownHosts))
-                {
-                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
-                    var parts = line.Split(' ', 2);
-                    if (parts.Length < 1) continue;
-                    if (parts[0].Split(',').Any(h =>
-                            h.Equals(host, StringComparison.OrdinalIgnoreCase) ||
-                            h.Equals($"[{host}]", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        foreach (var name in new[] { "id_ed25519", "id_rsa", "id_ecdsa", "id_dsa" })
-                        {
-                            var candidate = Path.Combine(SshKeysFolder, name);
-                            if (IsPrivateKey(candidate)) return candidate;
-                        }
-                        break;
-                    }
-                }
-            }
-
+            // 2. Standard key filenames in preference order
             foreach (var name in new[] { "id_ed25519", "id_rsa", "id_ecdsa", "id_dsa" })
             {
                 var candidate = Path.Combine(SshKeysFolder, name);
@@ -388,9 +376,12 @@ namespace PowerTerminal.Services
 
         public void Disconnect()
         {
-            _readCts?.Cancel();
-            _readCts?.Dispose();
+            // Capture first so a concurrent Disconnect() can't race between
+            // Cancel() and Dispose() after _readCts is set to null.
+            var cts = _readCts;
             _readCts = null;
+            cts?.Cancel();
+            cts?.Dispose();
             try { _shellStream?.Dispose(); } catch { }
             _shellStream = null;
             if (_client?.IsConnected == true)
@@ -406,4 +397,4 @@ namespace PowerTerminal.Services
 
         public void Dispose() => Disconnect();
     }
-}
+}

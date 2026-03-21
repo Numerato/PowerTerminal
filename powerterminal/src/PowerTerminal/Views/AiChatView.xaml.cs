@@ -10,8 +10,11 @@ namespace PowerTerminal.Views
             InitializeComponent();
             DataContextChanged += (s, e) =>
             {
-                if (DataContext is AiChatViewModel vm)
-                    vm.MessagesChanged += ScrollToBottom;
+                // Unsubscribe from the previous VM to prevent a memory leak.
+                if (e.OldValue is AiChatViewModel oldVm)
+                    oldVm.MessagesChanged -= ScrollToBottom;
+                if (e.NewValue is AiChatViewModel newVm)
+                    newVm.MessagesChanged += ScrollToBottom;
             };
         }
 

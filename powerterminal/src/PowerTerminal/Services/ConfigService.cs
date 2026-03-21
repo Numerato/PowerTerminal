@@ -55,9 +55,17 @@ namespace PowerTerminal.Services
             string path = Path.Combine(_baseDir, "connections.json");
             if (!File.Exists(path))
                 return new List<SshConnection>();
-            string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<List<SshConnection>>(json, JsonOptions)
-                   ?? new List<SshConnection>();
+            try
+            {
+                string json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<List<SshConnection>>(json, JsonOptions)
+                       ?? new List<SshConnection>();
+            }
+            catch
+            {
+                // Return empty list on corrupt file rather than crashing startup.
+                return new List<SshConnection>();
+            }
         }
 
         public void SaveConnections(IEnumerable<SshConnection> connections)
@@ -73,9 +81,17 @@ namespace PowerTerminal.Services
             string path = Path.Combine(_baseDir, "settings.json");
             if (!File.Exists(path))
                 return new AppSettings();
-            string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
-                   ?? new AppSettings();
+            try
+            {
+                string json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
+                       ?? new AppSettings();
+            }
+            catch
+            {
+                // Return defaults on corrupt file rather than crashing startup.
+                return new AppSettings();
+            }
         }
 
         public void SaveSettings(AppSettings settings)
@@ -117,7 +133,11 @@ namespace PowerTerminal.Services
             bool isNew = string.IsNullOrWhiteSpace(wiki.FileName);
             if (isNew)
             {
-                wiki.FileName  = SanitizeFileName(wiki.Title) + ".json";
+                string safeName = SanitizeFileName(wiki.Title);
+                // Append 8 hex chars of the entry GUID so identically-titled wikis
+                // never overwrite each other.
+                string suffix = wiki.Id.ToString("N")[..8];
+                wiki.FileName  = $"{safeName}_{suffix}.json";
                 wiki.CreatedAt = DateTime.UtcNow;
             }
             wiki.UpdatedAt = DateTime.UtcNow;
@@ -139,7 +159,9 @@ namespace PowerTerminal.Services
         {
             foreach (char c in Path.GetInvalidFileNameChars())
                 name = name.Replace(c, '_');
-            return name.Replace(' ', '_').ToLowerInvariant();
+            name = name.Replace(' ', '_').ToLowerInvariant();
+            // Guard against titles that consist entirely of invalid chars / spaces.
+            return string.IsNullOrWhiteSpace(name) ? "wiki" : name;
         }
     }
 }

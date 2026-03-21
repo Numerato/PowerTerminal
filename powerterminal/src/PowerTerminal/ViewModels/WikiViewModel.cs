@@ -81,6 +81,10 @@ namespace PowerTerminal.ViewModels
             _log.LogWikiCommandExecuted(wiki.Title, resolved);
         }
 
+        // Compiled once; avoids re-parsing the pattern on every command resolution.
+        private static readonly Regex VarPattern =
+            new(@"\$variable:([^$]+)\$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>
         /// Resolves predefined machine variables ($CurrentDirectory$, etc.) and
         /// user variables ($variable:Name$).
@@ -89,31 +93,24 @@ namespace PowerTerminal.ViewModels
         {
             if (_activeTerminal == null) return command;
 
-            // Predefined variables
-            var predefined = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["$CurrentDirectory$"] = _activeTerminal.CurrentDirectory,
-                ["$OperatingSystem$"]  = _activeTerminal.OperatingSystem,
-                ["$version$"]          = _activeTerminal.OsVersion,
-                ["$homefolder$"]       = _activeTerminal.HomeFolder,
-                ["$hardware$"]         = _activeTerminal.Hardware,
-                ["$disksizes$"]        = _activeTerminal.DiskSizes,
-                ["$ipaddress$"]        = _activeTerminal.IpAddress,
-                ["$hostname$"]         = _activeTerminal.Hostname,
-                ["$cpu$"]              = _activeTerminal.CpuInfo,
-                ["$memory$"]           = _activeTerminal.TotalMemory,
-                ["$username$"]         = _activeTerminal.Username,
-                ["$uptime$"]           = _activeTerminal.Uptime,
-                ["$kernelversion$"]    = _activeTerminal.KernelVersion,
-            };
-
-            string result = command;
-            foreach (var kv in predefined)
-                result = result.Replace(kv.Key, kv.Value, StringComparison.OrdinalIgnoreCase);
+            // Chain Replace calls directly — avoids allocating a Dictionary on every invocation.
+            string result = command
+                .Replace("$CurrentDirectory$", _activeTerminal.CurrentDirectory, StringComparison.OrdinalIgnoreCase)
+                .Replace("$OperatingSystem$",  _activeTerminal.OperatingSystem,  StringComparison.OrdinalIgnoreCase)
+                .Replace("$version$",          _activeTerminal.OsVersion,        StringComparison.OrdinalIgnoreCase)
+                .Replace("$homefolder$",        _activeTerminal.HomeFolder,       StringComparison.OrdinalIgnoreCase)
+                .Replace("$hardware$",          _activeTerminal.Hardware,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$disksizes$",         _activeTerminal.DiskSizes,        StringComparison.OrdinalIgnoreCase)
+                .Replace("$ipaddress$",         _activeTerminal.IpAddress,        StringComparison.OrdinalIgnoreCase)
+                .Replace("$hostname$",          _activeTerminal.Hostname,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$cpu$",               _activeTerminal.CpuInfo,          StringComparison.OrdinalIgnoreCase)
+                .Replace("$memory$",            _activeTerminal.TotalMemory,      StringComparison.OrdinalIgnoreCase)
+                .Replace("$username$",          _activeTerminal.Username,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$uptime$",            _activeTerminal.Uptime,           StringComparison.OrdinalIgnoreCase)
+                .Replace("$kernelversion$",     _activeTerminal.KernelVersion,    StringComparison.OrdinalIgnoreCase);
 
             // User variables: $variable:Name$
-            var varPattern = new Regex(@"\$variable:([^$]+)\$", RegexOptions.IgnoreCase);
-            result = varPattern.Replace(result, m =>
+            result = VarPattern.Replace(result, m =>
             {
                 string varName = m.Groups[1].Value;
                 return PromptForVariable(varName) ?? m.Value;

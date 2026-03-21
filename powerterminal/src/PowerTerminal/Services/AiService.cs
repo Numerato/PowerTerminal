@@ -17,7 +17,9 @@ namespace PowerTerminal.Services
     {
         private readonly LoggingService _log;
         private AppSettings _settings;
-        private HttpClient? _http;
+        // Replaced atomically via Interlocked.Exchange so an in-flight ChatAsync
+        // never sees its HttpClient disposed underneath it.
+        private volatile HttpClient? _http;
 
         public AiService(LoggingService log, AppSettings settings)
         {
@@ -34,12 +36,15 @@ namespace PowerTerminal.Services
 
         private void RebuildClient()
         {
-            _http?.Dispose();
-            _http = new HttpClient();
-            _http.Timeout = TimeSpan.FromSeconds(120);
+            var newClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (!string.IsNullOrWhiteSpace(_settings.Ai.ApiToken))
-                _http.DefaultRequestHeaders.Authorization =
+                newClient.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", _settings.Ai.ApiToken);
+
+            // Swap atomically; dispose the old instance after the swap so any
+            // concurrent request that already captured it can finish cleanly.
+            var old = Interlocked.Exchange(ref _http, newClient);
+            old?.Dispose();
         }
 
         /// <summary>Sends a conversation and returns the assistant reply.</summary>
@@ -73,10 +78,14 @@ namespace PowerTerminal.Services
 
             string url = _settings.Ai.ApiBaseUrl.TrimEnd('/') + "/chat/completions";
 
+            // Capture locally so a concurrent RebuildClient() cannot dispose the
+            // instance we are about to await on.
+            var http = _http ?? throw new InvalidOperationException("HTTP client is not initialized.");
+
             HttpResponseMessage response;
             try
             {
-                response = await _http!.PostAsync(url, content, ct);
+                response = await http.PostAsync(url, content, ct);
             }
             catch (Exception ex)
             {
