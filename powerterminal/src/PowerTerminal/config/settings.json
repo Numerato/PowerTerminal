@@ -18,5 +18,7 @@
   },
   "LogDirectory": "logs",
   "EnableDebugLogging": false,
-  "WikiDirectory": "config/wikis"
+  "WikiDirectory": "config/wikis",
+  "SidepaneWidth": 400,
+  "EnablePowerEdit": true
 }

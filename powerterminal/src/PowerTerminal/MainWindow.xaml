@@ -6,9 +6,10 @@
         xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
         xmlns:views="clr-namespace:PowerTerminal.Views"
         mc:Ignorable="d"
-        Title="PowerTerminal"
+        Title="{Binding WindowTitle}"
+        Icon="{Binding WindowIcon}"
         Height="800" Width="1400"
-        MinHeight="500" MinWidth="800"
+        MinHeight="560" MinWidth="960"
         Background="Transparent"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -28,17 +29,19 @@
           CornerRadius="8"
           Background="{StaticResource BackgroundBrush}"
           ClipToBounds="True">
+    <!--
+      Two-row grid: title bar (fixed 34 px) + content row (*).
+      The content row uses a DockPanel so the 44 px sidebar is always
+      docked-right and cannot be overflowed by the terminal/panel area.
+    -->
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="34" />
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
 
       <!-- ════════════ CUSTOM TITLE BAR ════════════ -->
-      <Border Grid.Row="0" Grid.Column="0"
+      <Border Grid.Row="0"
               BorderThickness="0"
               CornerRadius="7,7,0,0"
               Background="{StaticResource TitleBarBrush}">
@@ -300,109 +303,16 @@
           </StackPanel>
         </Grid>
       </Border>
-      <!-- ════════════ CONTENT AREA ════════════ -->
-      <Grid Grid.Row="1" Grid.Column="0">
-        <Grid.ColumnDefinitions>
-          <!-- Terminal -->
-          <ColumnDefinition Width="*" MinWidth="200" />
-          <!-- Splitter -->
-          <ColumnDefinition Width="Auto" />
-          <!-- Right panel — width managed from code-behind (0 when closed, 30% when open) -->
-          <ColumnDefinition x:Name="PanelColumn" Width="0" MinWidth="0" />
-          <!-- Right activity sidebar -->
-          <ColumnDefinition Width="44" />
-        </Grid.ColumnDefinitions>
+      <!-- ════════════ CONTENT AREA (DockPanel keeps sidebar pinned) ════════════ -->
+      <!--
+        DockPanel guarantees the docked element (sidebar, 44 px right) always
+        gets its exact allocation. The fill child (terminal/panel grid) can never
+        overflow into the sidebar regardless of GridSplitter drag or window size.
+      -->
+      <DockPanel Grid.Row="1" LastChildFill="True">
 
-        <!-- ── Terminal area ── -->
-        <Border Grid.Column="0"
-                CornerRadius="8"
-                Background="{StaticResource PanelBrush}"
-                Margin="6,6,0,6"
-                ClipToBounds="True">
-          <Grid>
-          <!-- Welcome placeholder -->
-          <StackPanel HorizontalAlignment="Center"
-                      VerticalAlignment="Center"
-                      Visibility="{Binding ActiveTerminalTab,
-                                    Converter={StaticResource NullToVisInvertConverter}}">
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        Margin="0,0,0,14">
-              <Image Source="Images/powerterminal.png"
-                     Width="32" Height="32"
-                     VerticalAlignment="Center"
-                     Margin="0,4,8,0" />
-              <TextBlock Text="PowerTerminal"
-                         FontSize="28" FontWeight="Bold"
-                         Foreground="{StaticResource AccentBrush}"
-                         VerticalAlignment="Center" />
-            </StackPanel>
-            <TextBlock Text="Click + to open a connection"
-                       Foreground="{StaticResource ForegroundDimBrush}"
-                       FontSize="14"
-                       HorizontalAlignment="Center" />
-          </StackPanel>
-
-          <ItemsControl ItemsSource="{Binding TerminalTabs}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><Grid /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemContainerStyle>
-              <Style TargetType="ContentPresenter">
-                <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                <Setter Property="VerticalAlignment"   Value="Stretch"/>
-              </Style>
-            </ItemsControl.ItemContainerStyle>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
-                <views:TerminalTabView
-                  Visibility="{Binding IsActive, Converter={StaticResource BoolToVisConverter}}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          </Grid>
-        </Border>
-
-        <!-- ── Splitter ── -->
-        <GridSplitter Grid.Column="1"
-                      Width="6"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch"
-                      ResizeBehavior="PreviousAndNext"
-                      Background="Transparent"/>
-
-        <!-- ── Right panel (Wiki / AI Chat / Explorer / Settings) ── -->
-        <Border Grid.Column="2"
-                CornerRadius="8"
-                Margin="0,6,6,6"
-                ClipToBounds="True"
-                Background="{StaticResource SurfaceBrush}">
-          <Grid>
-            <!-- Wiki panel -->
-            <views:WikiView DataContext="{Binding Wiki}"
-                            Visibility="{Binding DataContext.WikiPanelActive,
-                                         RelativeSource={RelativeSource AncestorType=Window},
-                                         Converter={StaticResource BoolToVisConverter}}"/>
-            <!-- AI Chat panel -->
-            <views:AiChatView DataContext="{Binding AiChat}"
-                              Visibility="{Binding DataContext.AiChatPanelActive,
-                                           RelativeSource={RelativeSource AncestorType=Window},
-                                           Converter={StaticResource BoolToVisConverter}}"/>
-            <!-- Explorer panel -->
-            <views:ExplorerView
-                        Visibility="{Binding DataContext.ExplorerPanelActive,
-                                     RelativeSource={RelativeSource AncestorType=Window},
-                                     Converter={StaticResource BoolToVisConverter}}"/>
-            <!-- Settings panel -->
-            <views:SettingsPanelView
-                        Visibility="{Binding DataContext.SettingsPanelActive,
-                                     RelativeSource={RelativeSource AncestorType=Window},
-                                     Converter={StaticResource BoolToVisConverter}}"/>
-          </Grid>
-        </Border>
-
-        <!-- ── Right activity sidebar ── -->
-        <Border Grid.Column="3" Padding="0,10,0,0"
+        <!-- ── Right activity sidebar — docked right, always visible ── -->
+        <Border DockPanel.Dock="Right" Width="44" Padding="0,10,0,0"
                 Background="{StaticResource TitleBarBrush}"
                 BorderThickness="0">
           <StackPanel VerticalAlignment="Top">
@@ -465,7 +375,112 @@
 
           </StackPanel>
         </Border>
-      </Grid>
+
+        <!-- ── Terminal + panel grid (fills remaining width after sidebar) ── -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <!-- Terminal -->
+            <ColumnDefinition x:Name="TerminalColumn" Width="*" MinWidth="200" />
+            <!-- Splitter -->
+            <ColumnDefinition Width="Auto" />
+            <!-- Right panel — width managed from code-behind (0 when closed, open when active) -->
+            <ColumnDefinition x:Name="PanelColumn" Width="0" MinWidth="0" />
+          </Grid.ColumnDefinitions>
+
+          <!-- ── Terminal area ── -->
+          <Border x:Name="TerminalBorder"
+                  Grid.Column="0"
+                  CornerRadius="8"
+                  Background="{StaticResource PanelBrush}"
+                  Margin="6,6,0,6"
+                  ClipToBounds="True">
+            <Grid>
+              <!-- Welcome placeholder -->
+              <StackPanel HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Visibility="{Binding ActiveTerminalTab,
+                                        Converter={StaticResource NullToVisInvertConverter}}">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            Margin="0,0,0,14">
+                  <Image Source="Images/powerterminal.png"
+                         Width="32" Height="32"
+                         VerticalAlignment="Center"
+                         Margin="0,4,8,0" />
+                  <TextBlock Text="PowerTerminal"
+                             FontSize="28" FontWeight="Bold"
+                             Foreground="{StaticResource AccentBrush}"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Text="Click + to open a connection"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="14"
+                           HorizontalAlignment="Center" />
+              </StackPanel>
+
+              <ItemsControl ItemsSource="{Binding TerminalTabs}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><Grid /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                  <Style TargetType="ContentPresenter">
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalAlignment"   Value="Stretch"/>
+                  </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:TerminalTabViewModel}">
+                    <views:TerminalTabView
+                      Visibility="{Binding IsActive, Converter={StaticResource BoolToVisConverter}}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Grid>
+          </Border>
+
+          <!-- ── Splitter ── -->
+          <GridSplitter x:Name="MainSplitter"
+                        Grid.Column="1"
+                        Width="6"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        ResizeBehavior="PreviousAndNext"
+                        Background="Transparent"
+                        DragCompleted="Splitter_DragCompleted"/>
+
+          <!-- ── Right panel (Wiki / AI Chat / Explorer / Settings) ── -->
+          <Border Grid.Column="2"
+                  CornerRadius="8"
+                  Margin="0,6,6,6"
+                  ClipToBounds="True"
+                  Background="{StaticResource SurfaceBrush}">
+            <Grid>
+              <!-- Wiki panel -->
+              <views:WikiView DataContext="{Binding Wiki}"
+                              Visibility="{Binding DataContext.WikiPanelActive,
+                                           RelativeSource={RelativeSource AncestorType=Window},
+                                           Converter={StaticResource BoolToVisConverter}}"/>
+              <!-- AI Chat panel -->
+              <views:AiChatView DataContext="{Binding AiChat}"
+                                Visibility="{Binding DataContext.AiChatPanelActive,
+                                             RelativeSource={RelativeSource AncestorType=Window},
+                                             Converter={StaticResource BoolToVisConverter}}"/>
+              <!-- Explorer panel -->
+              <views:ExplorerView
+                          Visibility="{Binding DataContext.ExplorerPanelActive,
+                                       RelativeSource={RelativeSource AncestorType=Window},
+                                       Converter={StaticResource BoolToVisConverter}}"/>
+              <!-- Settings panel -->
+              <views:SettingsPanelView
+                          Visibility="{Binding DataContext.SettingsPanelActive,
+                                       RelativeSource={RelativeSource AncestorType=Window},
+                                       Converter={StaticResource BoolToVisConverter}}"/>
+            </Grid>
+          </Border>
+
+        </Grid>
+
+      </DockPanel>
     </Grid>
   </Border>
 </Window>

@@ -21,6 +21,7 @@ namespace PowerTerminal.Views
         {
             var s = _config.LoadSettings();
             DebugLoggingCheck.IsChecked  = s.EnableDebugLogging;
+            EnablePowerEditCheck.IsChecked = s.EnablePowerEdit;
             ApiBaseUrl.Text              = s.Ai.ApiBaseUrl;
             ApiToken.Password            = s.Ai.ApiToken;
             ModelName.Text               = s.Ai.Model;
@@ -34,17 +35,18 @@ namespace PowerTerminal.Views
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             var s = _config.LoadSettings();
-            s.EnableDebugLogging = DebugLoggingCheck.IsChecked == true;
-            s.Ai.ApiBaseUrl      = ApiBaseUrl.Text.Trim();
-            s.Ai.ApiToken        = ApiToken.Password;
-            s.Ai.Model           = ModelName.Text.Trim();
-            s.Ai.Temperature     = Temperature.Value;
-            s.Ai.SystemPrompt    = SystemPrompt.Text;
-            s.Theme.FontFamily   = FontFamilyInput.Text.Trim();
+            s.EnableDebugLogging  = DebugLoggingCheck.IsChecked == true;
+            s.EnablePowerEdit     = EnablePowerEditCheck.IsChecked == true;
+            s.Ai.ApiBaseUrl       = ApiBaseUrl.Text.Trim();
+            s.Ai.ApiToken         = ApiToken.Password;
+            s.Ai.Model            = ModelName.Text.Trim();
+            s.Ai.Temperature      = Temperature.Value;
+            s.Ai.SystemPrompt     = SystemPrompt.Text;
+            s.Theme.FontFamily    = FontFamilyInput.Text.Trim();
             if (double.TryParse(FontSizeInput.Text, NumberStyles.Any,
                     CultureInfo.InvariantCulture, out double fs))
                 s.Theme.FontSize = fs;
-            s.SshKeysFolder      = SshKeysFolderInput.Text.Trim();
+            s.SshKeysFolder       = SshKeysFolderInput.Text.Trim();
             _config.SaveSettings(s);
 
             MessageBox.Show("Settings saved. Reconnect active tabs for theme changes to take effect.",

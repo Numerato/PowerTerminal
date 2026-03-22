@@ -16,6 +16,12 @@ namespace PowerTerminal.Models
         /// </summary>
         public string SshKeysFolder { get; set; } =
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + @"\.ssh";
+
+        /// <summary>Remembered width (pixels) of the side panel after the user resizes it.</summary>
+        public double SidepaneWidth { get; set; } = 400;
+
+        /// <summary>When true, the PowerEdit enhanced editing features are active.</summary>
+        public bool EnablePowerEdit { get; set; } = true;
     }
 
     public class AiSettings

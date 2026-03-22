@@ -42,7 +42,7 @@ public readonly struct TerminalColor : IEquatable<TerminalColor>
             default:
                 return Index == 0
                     ? Color.FromRgb(0xEE, 0xEE, 0xEC)  // DefaultFg: Ubuntu #EEEEEC
-                    : Color.FromRgb(0x30, 0x0A, 0x24);  // DefaultBg: Ubuntu #300A24
+                    : Color.FromRgb(0x1A, 0x1A, 0x1A);  // DefaultBg: #1A1A1A
         }
     }
 

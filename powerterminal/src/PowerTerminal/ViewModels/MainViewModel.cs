@@ -2,6 +2,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using PowerTerminal.Models;
 using PowerTerminal.Services;
 
@@ -87,7 +89,27 @@ namespace PowerTerminal.ViewModels
                     foreach (var tab in TerminalTabs)
                         tab.IsActive = (tab == value);
                     Wiki.ActiveTerminal = value;
+                    OnPropertyChanged(nameof(WindowTitle));
+                    OnPropertyChanged(nameof(WindowIcon));
                 }
+            }
+        }
+
+        /// <summary>Window title shown in the taskbar: active tab name or default app name.</summary>
+        public string WindowTitle => _activeTerminalTab?.Header ?? "PowerTerminal";
+
+        /// <summary>Taskbar icon: tab logo when set, otherwise the default app icon.</summary>
+        public ImageSource? WindowIcon
+        {
+            get
+            {
+                var logoPath = _activeTerminalTab?.LogoPath;
+                if (!string.IsNullOrEmpty(logoPath))
+                {
+                    try { return new BitmapImage(new Uri(logoPath, UriKind.RelativeOrAbsolute)); }
+                    catch { /* fall through to default */ }
+                }
+                return null; // null → WPF uses the Window's own Icon from XAML
             }
         }
 
@@ -174,15 +196,21 @@ namespace PowerTerminal.ViewModels
             ActiveTerminalTab = tab;
         }
 
-        /// <summary>Disconnects, disposes and removes a tab; activates the last remaining tab.</summary>
+        /// <summary>Disconnects, disposes and removes a tab; activates the previous tab.</summary>
         public void RemoveTab(TerminalTabViewModel tab)
         {
             if (!TerminalTabs.Contains(tab)) return;
+            int idx = TerminalTabs.IndexOf(tab);
             tab.Disconnect();
             tab.Dispose();
             TerminalTabs.Remove(tab);
             if (ActiveTerminalTab == tab)
-                ActiveTerminalTab = TerminalTabs.LastOrDefault();
+            {
+                // Activate the tab that was directly before the closed one, or the new last tab.
+                ActiveTerminalTab = TerminalTabs.Count > 0
+                    ? TerminalTabs[Math.Max(0, idx - 1)]
+                    : null;
+            }
         }
 
         private void ConnectSelectedConnection()

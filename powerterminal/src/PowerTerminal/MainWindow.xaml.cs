@@ -3,11 +3,13 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Terminal.Controls;
 using PowerTerminal.Models;
+using PowerTerminal.Services;
 using PowerTerminal.ViewModels;
 using PowerTerminal.Views;
 
@@ -31,8 +33,11 @@ namespace PowerTerminal
             // Maximize on startup
             WindowState = WindowState.Normal;
 
-            // Watch panel open/close to resize the panel column to 30% or 0
+            // Watch panel open/close to resize the panel column to saved width or 0
             Vm.PropertyChanged += OnVmPropertyChanged;
+
+            // Splitter starts hidden (no panel open); terminal gets symmetric margins
+            ClosePanel();
 
             // Block F1 help dialog
             CommandBindings.Add(new CommandBinding(ApplicationCommands.Help,
@@ -45,14 +50,71 @@ namespace PowerTerminal
 
             if (Vm.IsPanelOpen)
             {
-                // 30% of the available width (total minus sidebar strip)
-                double available = ActualWidth - 34;
-                PanelColumn.Width = new GridLength(available * 0.30, GridUnitType.Pixel);
+                var settings = new ConfigService().LoadSettings();
+                double savedWidth = settings.SidepaneWidth > 50 ? settings.SidepaneWidth : 400;
+                OpenPanel(savedWidth);
             }
             else
             {
-                PanelColumn.Width = new GridLength(0, GridUnitType.Pixel);
+                ClosePanel();
             }
+        }
+
+        /// <summary>
+        /// Opens the side panel using star-based column sizing so WPF's layout engine
+        /// automatically honours the terminal's MinWidth at any window size.
+        /// The sidebar now lives in the outer grid's own 44 px column, so the content
+        /// grid only needs to account for the splitter (6 px).
+        /// </summary>
+        private void OpenPanel(double desiredPanelPx)
+        {
+            // Available flexible width = content-area width minus splitter (6 px).
+            // The sidebar (44 px) is in the outer grid — not our concern here.
+            double available = Math.Max(1, ActualWidth - 44 - 6);
+
+            // Ensure the terminal keeps at least its MinWidth (200) + left margin (6).
+            double panelPx = Math.Min(desiredPanelPx, available - 200 - 6);
+            panelPx = Math.Max(100, panelPx);
+
+            // Express as a star ratio relative to the terminal column (which stays at 1*).
+            double terminalPx = Math.Max(1, available - panelPx);
+            double panelStars = panelPx / terminalPx;
+
+            // Always restore both columns to star sizing so they scale correctly on window resize.
+            // (WPF GridSplitter converts star→pixel during drag; we counteract that here.)
+            TerminalColumn.MinWidth = 200;
+            TerminalColumn.Width    = new GridLength(1, GridUnitType.Star);
+            PanelColumn.MinWidth    = 100;
+            PanelColumn.MaxWidth    = double.PositiveInfinity;
+            PanelColumn.Width       = new GridLength(panelStars, GridUnitType.Star);
+
+            MainSplitter.Visibility = Visibility.Visible;
+            TerminalBorder.Margin   = new Thickness(6, 6, 0, 6);
+        }
+
+        private void ClosePanel()
+        {
+            PanelColumn.MinWidth = 0;
+            PanelColumn.MaxWidth = double.PositiveInfinity;
+            PanelColumn.Width    = new GridLength(0, GridUnitType.Pixel);
+
+            MainSplitter.Visibility = Visibility.Collapsed;
+            TerminalBorder.Margin   = new Thickness(6, 6, 6, 6);
+        }
+
+        private void Splitter_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            double width = PanelColumn.ActualWidth;
+            if (width < 50) return; // panel being collapsed — don't save
+
+            var configSvc = new ConfigService();
+            var settings  = configSvc.LoadSettings();
+            settings.SidepaneWidth = width;
+            configSvc.SaveSettings(settings);
+
+            // WPF GridSplitter converts star columns → pixel during the drag.
+            // Re-apply star sizing so columns shrink proportionally on window resize.
+            OpenPanel(width);
         }
 
         // F1 generates a routed Help command that WPF processes via KeyDown tunnelling.
@@ -114,6 +176,20 @@ namespace PowerTerminal
 
         private void CloseWindow_Click(object sender, RoutedEventArgs e)
             => Close();
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            base.OnClosing(e);
+            if (Vm.TerminalTabs.Count > 0)
+            {
+                var dlg = new DarkConfirmWindow(
+                    "Close PowerTerminal",
+                    $"There {(Vm.TerminalTabs.Count == 1 ? "is 1 active terminal" : $"are {Vm.TerminalTabs.Count} active terminals")}. Close anyway?")
+                { Owner = this };
+                if (dlg.ShowDialog() != true)
+                    e.Cancel = true;
+            }
+        }
 
         private void UpdateMaxRestoreIcon()
         {
@@ -193,6 +269,13 @@ namespace PowerTerminal
         /// </summary>
         private void SnapHeightToLineGrid(IntPtr wParam, IntPtr lParam)
         {
+            int edge = wParam.ToInt32();
+            // Only snap height when resizing a vertical edge.
+            // For WMSZ_LEFT (1) and WMSZ_RIGHT (2) the user is only changing
+            // the width — don't touch the height at all.
+            const int WMSZ_LEFT  = 1;
+            const int WMSZ_RIGHT = 2;
+            if (edge == WMSZ_LEFT || edge == WMSZ_RIGHT) return;
             // Find the active terminal control to read its char height
             double charHeight = GetActiveTerminalCharHeight();
             if (charHeight <= 1) return;
@@ -214,7 +297,6 @@ namespace PowerTerminal
             int lines = Math.Max(1, (int)Math.Round(contentPx / lineHeightPx));
             int snappedTotal = (int)Math.Round(lines * lineHeightPx + chromePx);
 
-            int edge = wParam.ToInt32();
             bool topEdge = edge == WMSZ_TOP || edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT;
 
             if (topEdge)
@@ -280,7 +362,7 @@ namespace PowerTerminal
         [DllImport("user32.dll")]
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-        private static void WmGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+        private void WmGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
         {
             const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
             var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
@@ -298,8 +380,12 @@ namespace PowerTerminal
                 mmi.ptMaxPosition.y = Math.Abs(work.top    - monitor2.top);
                 mmi.ptMaxSize.x     = Math.Abs(work.right  - work.left);
                 mmi.ptMaxSize.y     = Math.Abs(work.bottom - work.top);
-                mmi.ptMinTrackSize.x = 800;
-                mmi.ptMinTrackSize.y = 500;
+
+                // Scale the WPF DIP minimums (960×560) to physical pixels so the
+                // OS minimum matches WPF's MinWidth/MinHeight at any DPI setting.
+                var dpi  = VisualTreeHelper.GetDpi(this);
+                mmi.ptMinTrackSize.x = (int)Math.Ceiling(960 * dpi.DpiScaleX);
+                mmi.ptMinTrackSize.y = (int)Math.Ceiling(560 * dpi.DpiScaleY);
             }
 
             Marshal.StructureToPtr(mmi, lParam, true);

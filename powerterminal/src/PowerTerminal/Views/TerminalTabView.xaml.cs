@@ -2,6 +2,8 @@ using System;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Threading;
 using PowerTerminal.ViewModels;
 using Terminal.Ssh;
 
@@ -59,7 +61,7 @@ namespace PowerTerminal.Views
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (_vm?.IsActive == true) Terminal.Focus();
+            if (_vm?.IsActive == true) FocusTerminal();
 
             if (_vm?.AutoConnectOnLoad == true)
             {
@@ -71,7 +73,16 @@ namespace PowerTerminal.Views
         private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (e.NewValue is true)
+                FocusTerminal();
+        }
+
+        private void FocusTerminal()
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
                 Terminal.Focus();
+                Keyboard.Focus(Terminal);
+            }));
         }
 
         private async System.Threading.Tasks.Task DoConnectAsync()
