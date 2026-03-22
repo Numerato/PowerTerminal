@@ -152,9 +152,10 @@ namespace PowerTerminal.ViewModels
             var connection = new SshConnection { Name = "Local Terminal" };
             var tab = new TerminalTabViewModel(_log)
             {
-                Connection = connection,
-                Header     = connection.Name,
-                Theme      = settings.Theme
+                Connection      = connection,
+                Header          = connection.Name,
+                Theme           = settings.Theme,
+                EnablePowerEdit = settings.EnablePowerEdit
             };
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
@@ -163,10 +164,12 @@ namespace PowerTerminal.ViewModels
 
         private TerminalTabViewModel AddTabForConnection(SshConnection connection)
         {
+            var settings = _config.LoadSettings();
             var tab = new TerminalTabViewModel(_log)
             {
-                Connection = connection,
-                Header     = connection.Name
+                Connection      = connection,
+                Header          = connection.Name,
+                EnablePowerEdit = settings.EnablePowerEdit
             };
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
@@ -187,7 +190,8 @@ namespace PowerTerminal.ViewModels
                 Header            = conn.Name,
                 AutoConnectOnLoad = true,
                 SshKeysFolder     = settings.SshKeysFolder,
-                Theme             = settings.Theme
+                Theme             = settings.Theme,
+                EnablePowerEdit   = settings.EnablePowerEdit
                 // InlinePasswordCollector is wired by TerminalTabView.OnDataContextChanged
                 // when the tab's view is created — no popup dialog needed.
             };

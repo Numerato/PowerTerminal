@@ -26,6 +26,9 @@ namespace PowerTerminal.ViewModels
         /// </summary>
         public bool AutoConnectOnLoad { get; set; }
 
+        /// <summary>When true the terminal intercepts "poweredit &lt;file&gt;" commands instead of forwarding them to the shell.</summary>
+        public bool EnablePowerEdit { get; set; }
+
         /// <summary>SSH keys folder passed to <see cref="SshService"/>.</summary>
         public string SshKeysFolder { get; set; } =
             System.IO.Path.Combine(
@@ -190,6 +193,18 @@ namespace PowerTerminal.ViewModels
 
         /// <summary>Send a string to the active SSH session (e.g. from the wiki command runner).</summary>
         public void SendData(string data) => _ssh?.Send(data);
+
+        /// <summary>Run a command out-of-band (not through the interactive shell) and return its output.</summary>
+        public Task<string> RunCommandAsync(string cmd)
+            => _ssh?.RunCommandAsync(cmd) ?? Task.FromResult(string.Empty);
+
+        /// <summary>Read a remote file's content via SSH exec channel.</summary>
+        public Task<(string Content, bool Success)> ReadFileAsync(string path, string sudoPassword = "")
+            => _ssh?.ReadFileAsync(path, sudoPassword) ?? Task.FromResult((string.Empty, false));
+
+        /// <summary>Write content to a remote file via SSH exec channel.</summary>
+        public Task<bool> WriteFileAsync(string path, string content, string sudoPassword = "")
+            => _ssh?.WriteFileAsync(path, content, sudoPassword) ?? Task.FromResult(false);
 
         public void Disconnect()
         {

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using PowerTerminal.Views;
 
 namespace PowerTerminal
 {
@@ -24,7 +25,7 @@ namespace PowerTerminal
                 }
                 catch { /* never let a logging failure suppress the original error */ }
 
-                MessageBox.Show(
+                DarkMessageBox.Show(
                     $"Unhandled error: {args.Exception.Message}\n\n{args.Exception.StackTrace}",
                     "PowerTerminal Error",
                     MessageBoxButton.OK,

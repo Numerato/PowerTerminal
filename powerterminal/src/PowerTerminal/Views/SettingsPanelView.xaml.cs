@@ -49,7 +49,9 @@ namespace PowerTerminal.Views
             s.SshKeysFolder       = SshKeysFolderInput.Text.Trim();
             _config.SaveSettings(s);
 
-            MessageBox.Show("Settings saved. Reconnect active tabs for theme changes to take effect.",
+            DarkMessageBox.Show(
+                Window.GetWindow(this),
+                "Settings saved. Reconnect active tabs for theme changes to take effect.",
                 "Settings", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 

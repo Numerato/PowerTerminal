@@ -33,7 +33,8 @@ namespace PowerTerminal.Views
         private void DeleteWiki_Click(object sender, RoutedEventArgs e)
         {
             if (Vm?.SelectedEntry == null) return;
-            var result = MessageBox.Show(
+            var result = DarkMessageBox.Show(
+                Window.GetWindow(this),
                 $"Delete wiki '{Vm.SelectedEntry.Title}'?",
                 "Confirm Delete",
                 MessageBoxButton.YesNo,

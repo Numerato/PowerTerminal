@@ -95,8 +95,9 @@ public sealed class TerminalControl : FrameworkElement
 
     private int _scrollOffset; // 0 = live bottom, positive = scrolled up
 
-    // Password mode
-    private bool _isPasswordMode;
+    // Password / input prompt mode
+    private bool _isPasswordMode;          // masked (no echo)
+    private bool _isInputMode;             // visible echo
     private readonly StringBuilder _passwordBuffer = new();
     private TaskCompletionSource<string>? _passwordTcs;
 
@@ -104,6 +105,13 @@ public sealed class TerminalControl : FrameworkElement
     private (int row, int col)? _selStart;
     private (int row, int col)? _selEnd;
     private bool _isSelecting;
+
+    // PowerEdit: tracks what the user is typing on the current shell line
+    private readonly StringBuilder _commandBuffer = new();
+    /// <summary>When true, "poweredit &lt;file&gt;" commands are intercepted before they reach the shell.</summary>
+    public bool EnablePowerEdit { get; set; }
+    /// <summary>Fired when a "poweredit &lt;file&gt;" command is intercepted. Arg is the full command string.</summary>
+    public event EventHandler<string>? PowerEditCommand;
 
     public TerminalControl()
     {
@@ -484,14 +492,15 @@ public sealed class TerminalControl : FrameworkElement
         bool alt  = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
         bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
 
-        // Password mode: capture input without echo
-        if (_isPasswordMode)
+        // Password / input prompt mode: capture input without (or with) echo
+        if (_isPasswordMode || _isInputMode)
         {
             if (effectiveKey == Key.Return)
             {
                 string pwd = _passwordBuffer.ToString();
                 _passwordBuffer.Clear();
                 _isPasswordMode = false;
+                _isInputMode    = false;
                 var tcs = _passwordTcs;
                 _passwordTcs = null;
                 _emulator?.ProcessBytes("\r\n"u8.ToArray(), 0, 2);
@@ -502,12 +511,19 @@ public sealed class TerminalControl : FrameworkElement
             else if (effectiveKey == Key.Back)
             {
                 if (_passwordBuffer.Length > 0)
+                {
                     _passwordBuffer.Remove(_passwordBuffer.Length - 1, 1);
+                    if (_isInputMode)
+                    {
+                        // Erase the last echoed character: backspace + space + backspace
+                        _emulator?.ProcessBytes("\x08 \x08"u8.ToArray(), 0, 3);
+                        QueueRender();
+                    }
+                }
                 e.Handled = true;
             }
             // Do NOT mark other keys as handled — TextInput must fire so
-            // OnTextInput can append characters to _passwordBuffer.
-            // The normal key-to-session path below is a no-op while disconnected.
+            // OnTextInput can append characters to the buffer.
             return;
         }
 
@@ -537,6 +553,43 @@ public sealed class TerminalControl : FrameworkElement
 
         if (_session == null || !_session.IsConnected) return;
 
+        // PowerEdit: track command buffer and intercept "poweredit <file>" on Enter
+        if (EnablePowerEdit && !ctrl && !alt)
+        {
+            if (effectiveKey == Key.Back && !shift)
+            {
+                if (_commandBuffer.Length > 0)
+                    _commandBuffer.Remove(_commandBuffer.Length - 1, 1);
+            }
+            else if (effectiveKey == Key.Up || effectiveKey == Key.Down)
+            {
+                _commandBuffer.Clear(); // history navigation — buffer is stale
+            }
+            else if (effectiveKey == Key.Return && !shift)
+            {
+                _commandBuffer.Clear();
+                // Read the command directly from the terminal buffer — this captures
+                // tab-completed text that was echoed back by the shell and never
+                // passed through OnTextInput.
+                string cmd = GetCurrentLineCommand();
+                if (cmd.Equals("poweredit", StringComparison.OrdinalIgnoreCase) ||
+                    cmd.StartsWith("poweredit ", StringComparison.OrdinalIgnoreCase))
+                {
+                    _session.Send("\r"); // let bash echo + run the silent ~/bin/poweredit script
+                    PowerEditCommand?.Invoke(this, cmd);
+                    e.Handled = true;
+                    return;
+                }
+                // Normal Enter: let MapKey send \r below
+            }
+        }
+        else if (EnablePowerEdit && ctrl && !alt)
+        {
+            // Ctrl+U (erase line) or Ctrl+C (cancel) invalidate the buffer
+            if (effectiveKey == Key.U || effectiveKey == Key.C)
+                _commandBuffer.Clear();
+        }
+
         bool appCursor = _emulator?.ApplicationCursorKeys == true;
         byte[]? seq = MapKey(effectiveKey, ctrl, alt, shift, appCursor);
         if (seq != null)
@@ -548,10 +601,22 @@ public sealed class TerminalControl : FrameworkElement
 
     protected override void OnTextInput(TextCompositionEventArgs e)
     {
-        if (_isPasswordMode)
+        if (_isPasswordMode || _isInputMode)
         {
             foreach (char c in e.Text)
-                if (c >= 0x20 && c != 0x7F) _passwordBuffer.Append(c);
+            {
+                if (c >= 0x20 && c != 0x7F)
+                {
+                    _passwordBuffer.Append(c);
+                    if (_isInputMode)
+                    {
+                        // Echo the character visibly
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(c.ToString());
+                        _emulator?.ProcessBytes(bytes, 0, bytes.Length);
+                        QueueRender();
+                    }
+                }
+            }
             e.Handled = true;
             return;
         }
@@ -560,11 +625,79 @@ public sealed class TerminalControl : FrameworkElement
         {
             if (c < 0x20 || c == 0x7F) return;
         }
+        if (EnablePowerEdit)
+            _commandBuffer.Append(e.Text);
         if (_emulator?.BracketedPaste == true && e.Text.Length > 1)
             _session.Send("\x1b[200~" + e.Text + "\x1b[201~");
         else
             _session.Send(e.Text);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Reads the current cursor row from the terminal buffer and returns the portion
+    /// starting from "poweredit" (case-insensitive). Returns empty string if not found.
+    /// This is more reliable than tracking keystrokes because it captures text echoed
+    /// back by the shell (e.g. tab-completed filenames).
+    /// </summary>
+    private string GetCurrentLineCommand()
+    {
+        if (_emulator == null) return string.Empty;
+        var buf = _emulator.Buffer;
+        int row = buf.CursorRow;
+
+        var sb = new StringBuilder(buf.Columns);
+        for (int c = 0; c < buf.Columns; c++)
+            sb.Append(buf.GetCellCopy(row, c).Character.ToString());
+
+        string line = sb.ToString().TrimEnd();
+
+        // Extract from "poweredit" onwards, ignoring the shell prompt prefix
+        int idx = line.IndexOf("poweredit", StringComparison.OrdinalIgnoreCase);
+        return idx >= 0 ? line[idx..] : string.Empty;
+    }
+
+    /// <summary>
+    /// Parses the shell prompt on the current cursor row to extract the current working
+    /// directory. Handles the common bash PS1 pattern: user@host:PATH$ or user@host:PATH#
+    /// Returns empty string if the CWD cannot be determined.
+    /// </summary>
+    public string GetCurrentWorkingDir()
+    {
+        if (_emulator == null) return string.Empty;
+        var buf = _emulator.Buffer;
+        int row = buf.CursorRow;
+
+        var sb = new StringBuilder(buf.Columns);
+        for (int c = 0; c < buf.Columns; c++)
+            sb.Append(buf.GetCellCopy(row, c).Character.ToString());
+
+        string line = sb.ToString().TrimEnd();
+
+        // Find where the command starts so we only look at the prompt portion
+        int cmdIdx = line.IndexOf("poweredit", StringComparison.OrdinalIgnoreCase);
+        string prompt = cmdIdx > 0 ? line[..cmdIdx] : line;
+
+        // Common bash prompt pattern: ends with ":PATH$ " or ":PATH# "
+        // Find the last colon and extract up to the prompt delimiter ($ or #)
+        int colonIdx = prompt.LastIndexOf(':');
+        if (colonIdx < 0) return string.Empty;
+
+        string afterColon = prompt[(colonIdx + 1)..];
+        // Trim the prompt delimiter and trailing spaces
+        int delimIdx = -1;
+        for (int i = afterColon.Length - 1; i >= 0; i--)
+        {
+            char ch = afterColon[i];
+            if (ch == '$' || ch == '#' || ch == '%')
+            {
+                delimIdx = i;
+                break;
+            }
+        }
+        string dir = delimIdx >= 0 ? afterColon[..delimIdx].Trim() : afterColon.Trim();
+
+        return (dir.StartsWith("/") || dir.StartsWith("~")) ? dir : string.Empty;
     }
 
     private static byte[]? MapKey(Key key, bool ctrl, bool alt, bool shift, bool appCursor)
@@ -953,6 +1086,27 @@ public sealed class TerminalControl : FrameworkElement
             _emulator!.ProcessBytes(bytes, 0, bytes.Length);
             _passwordBuffer.Clear();
             _isPasswordMode = true;
+            tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _passwordTcs = tcs;
+            QueueRender();
+        });
+        return await tcs.Task;
+    }
+
+    /// <summary>
+    /// Shows <paramref name="promptText"/> in the terminal and reads a line of
+    /// visible input (characters are echoed). Used for non-secret prompts.
+    /// </summary>
+    public async Task<string> PromptForInputAsync(string promptText, CancellationToken ct)
+    {
+        TaskCompletionSource<string> tcs = null!;
+        await Dispatcher.InvokeAsync(() =>
+        {
+            EnsureEmulatorInitialized();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(promptText);
+            _emulator!.ProcessBytes(bytes, 0, bytes.Length);
+            _passwordBuffer.Clear();
+            _isInputMode = true;
             tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             _passwordTcs = tcs;
             QueueRender();

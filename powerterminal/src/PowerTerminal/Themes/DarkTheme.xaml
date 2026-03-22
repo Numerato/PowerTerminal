@@ -52,6 +52,7 @@
     <SolidColorBrush x:Key="AccentPressedBrush"    Color="{StaticResource AccentPressedColor}"/>
     <SolidColorBrush x:Key="SuccessBrush"          Color="{StaticResource SuccessColor}"/>
     <SolidColorBrush x:Key="ErrorBrush"            Color="{StaticResource ErrorColor}"/>
+    <SolidColorBrush x:Key="WarningBrush"          Color="{StaticResource WarningColor}"/>
     <SolidColorBrush x:Key="SelectionBrush"        Color="{StaticResource SelectionColor}"/>
     <SolidColorBrush x:Key="TransparentBrush"      Color="Transparent"/>
     <SolidColorBrush x:Key="TabInactiveBrush"      Color="{StaticResource TabInactiveColor}"/>
@@ -710,33 +711,85 @@
         </Setter>
     </Style>
 
-    <!-- MenuItem Style -->
+    <!-- MenuItem Style — handles TopLevelHeader, TopLevelItem, SubmenuItem, SubmenuHeader -->
     <Style TargetType="{x:Type MenuItem}">
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Foreground" Value="{StaticResource MenuForegroundBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type MenuItem}">
-                    <Border x:Name="Border" Padding="5,2,5,2" BorderThickness="1" Background="Transparent">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="Icon"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="Shortcut"/>
-                                <ColumnDefinition Width="13"/>
-                            </Grid.ColumnDefinitions>
-                            <ContentPresenter x:Name="Icon" Margin="6,0,6,0" VerticalAlignment="Center" ContentSource="Icon"/>
-                            <ContentPresenter x:Name="HeaderHost" Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                            <ContentPresenter x:Name="InputGestureText" Grid.Column="2" ContentSource="InputGestureText" VerticalAlignment="Center"/>
-                        </Grid>
-                    </Border>
+                    <Grid>
+                        <!-- Clickable row -->
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                Padding="10,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="Header"
+                                                  Grid.Column="0"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="Center"/>
+                                <TextBlock x:Name="Gesture"
+                                           Grid.Column="1"
+                                           Text="{TemplateBinding InputGestureText}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource ForegroundDimBrush}"
+                                           Margin="20,0,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Submenu popup — opens below for top-level, right for nested -->
+                        <Popup x:Name="PART_Popup"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               Placement="Bottom"
+                               PopupAnimation="None">
+                            <Border Background="{StaticResource MenuBackgroundBrush}"
+                                    BorderBrush="{StaticResource MenuBorderBrush}"
+                                    BorderThickness="1"
+                                    Padding="0,2">
+                                <StackPanel IsItemsHost="True"/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsHighlighted" Value="true">
+                        <!-- Submenu items: compact horizontal padding, popup opens right -->
+                        <Trigger Property="Role" Value="SubmenuItem">
+                            <Setter TargetName="Border"  Property="Padding" Value="8,4,20,4"/>
+                            <Setter TargetName="PART_Popup" Property="Placement" Value="Right"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="Border"  Property="Padding" Value="8,4,20,4"/>
+                            <Setter TargetName="PART_Popup" Property="Placement" Value="Right"/>
+                        </Trigger>
+                        <!-- Top-level items: no gesture text shown in menu bar -->
+                        <Trigger Property="Role" Value="TopLevelItem">
+                            <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <Trigger Property="Role" Value="TopLevelHeader">
+                            <Setter TargetName="Gesture" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                        <!-- Hover / keyboard highlight -->
+                        <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}"/>
+                            <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             <Setter Property="Foreground" Value="White"/>
                         </Trigger>
-                        <Trigger Property="IsEnabled" Value="false">
+                        <!-- Open submenu indicator -->
+                        <Trigger Property="IsSubmenuOpen" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource SurfaceHighBrush}"/>
+                        </Trigger>
+                        <!-- Disabled -->
+                        <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{StaticResource ForegroundDimBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>

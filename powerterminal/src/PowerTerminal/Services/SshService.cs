@@ -25,6 +25,11 @@ namespace PowerTerminal.Services
         private readonly LoggingService _log;
         private string _sessionName = string.Empty;
 
+        // Output is held until all initialization is complete so the terminal
+        // renders once cleanly instead of flashing during startup.
+        private readonly List<byte[]> _heldOutput = new();
+        private volatile bool _holdOutput = false;
+
         public SshService(LoggingService log)
         {
             _log = log;
@@ -186,8 +191,25 @@ namespace PowerTerminal.Services
             }, ct);
 
             _log.LogTerminalEvent(_sessionName, "Connected");
+
+            // Hold terminal output while initialization runs so the terminal
+            // renders once cleanly (no flashing prompt during startup).
+            _holdOutput = true;
             StartReading();
-            await GatherMachineInfoAsync();
+
+            // Run both init tasks in parallel; inject no longer needs a head-start delay.
+            await Task.WhenAll(GatherMachineInfoAsync(), InjectShellDefinitionsAsync());
+
+            // Release all buffered output in one shot → single clean render.
+            _holdOutput = false;
+            byte[][] pending;
+            lock (_heldOutput)
+            {
+                pending = _heldOutput.ToArray();
+                _heldOutput.Clear();
+            }
+            foreach (var chunk in pending)
+                DataReceived?.Invoke(this, chunk);
         }
 
         // ── ISshTerminalSession send methods ─────────────────────────────────
@@ -269,7 +291,14 @@ namespace PowerTerminal.Services
                             .Replace("\r\n", "\\n").Replace("\n", "\\n");
                         try { _log.LogTerminalOutput(_sessionName, logContent); } catch { }
 
-                        DataReceived?.Invoke(this, data);
+                        if (_holdOutput)
+                        {
+                            lock (_heldOutput) { _heldOutput.Add(data); }
+                        }
+                        else
+                        {
+                            DataReceived?.Invoke(this, data);
+                        }
                     }
                     catch (OperationCanceledException) { break; }
                     catch (Exception ex)
@@ -329,7 +358,63 @@ namespace PowerTerminal.Services
             MachineInfo = info;
         }
 
-        private string RunCommand(string cmd)
+        /// <summary>
+        /// Ensures a real 'poweredit' executable exists in the user's bin directory
+        /// (~/bin or ~/.local/bin).  Because bash scans PATH for completion candidates,
+        /// this makes 'po'+Tab list 'poweredit'.
+        ///
+        /// If the bin dir didn't exist before this session (Ubuntu's .profile only adds
+        /// ~/bin to PATH when the dir exists at login time), we also inject
+        /// "export PATH=..." into the interactive shell stream.  Since _holdOutput is
+        /// still true at that point, the echo lands in the held buffer and is rendered
+        /// as part of the normal initial login output — no flash, no history entry.
+        /// All subsequent sessions have ~/bin in PATH automatically.
+        /// </summary>
+        private async Task InjectShellDefinitionsAsync()
+        {
+            if (!IsConnected) return;
+
+            // GatherMachineInfoAsync runs in parallel, so query $HOME directly.
+            string homeDir = await Task.Run(() => RunCommand("echo $HOME").Trim());
+            if (string.IsNullOrEmpty(homeDir)) return;
+
+            // Exec channels don't source .bashrc/.profile, so check directory existence
+            // rather than $PATH.  If the dir existed before this session it is already
+            // in the interactive shell's PATH (via .profile); if not, we add it below.
+            (string binDir, bool existedBefore) = await Task.Run(() =>
+            {
+                foreach (var candidate in new[] { $"{homeDir}/bin", $"{homeDir}/.local/bin" })
+                {
+                    string result = RunCommand($"[ -d \"{candidate}\" ] && echo yes || echo no").Trim();
+                    if (result == "yes") return (candidate, true);
+                }
+                return ($"{homeDir}/bin", false);  // will be created
+            });
+
+            await Task.Run(() =>
+            {
+                // Always (re)write to ensure the script is the silent version —
+                // PowerTerminal intercepts the command client-side; the script only
+                // exists so bash can find it for tab-completion.
+                RunCommand($"mkdir -p \"{binDir}\"");
+                RunCommand(
+                    $"printf '#!/usr/bin/env bash\\nexit 0\\n'" +
+                    $" > \"{binDir}/poweredit\"");
+                RunCommand($"chmod +x \"{binDir}/poweredit\"");
+            });
+
+            // If ~/bin was just created it is not yet in the interactive session's PATH.
+            // Send a PATH update to the shell stream now.  _holdOutput is still true so
+            // the echo is buffered and released with the rest of the login output —
+            // it appears once in the terminal on this first-ever session, then never again.
+            if (!existedBefore && _shellStream != null)
+            {
+                Send($"export PATH=\"{binDir}:$PATH\"\r");
+            }
+        }
+
+
+        public string RunCommand(string cmd)
         {
             if (_client == null || !IsConnected) return string.Empty;
             try
@@ -340,6 +425,79 @@ namespace PowerTerminal.Services
             }
             catch { return string.Empty; }
         }
+
+        public Task<string> RunCommandAsync(string cmd) => Task.Run(() => RunCommand(cmd));
+
+        public Task<(string Output, int ExitCode)> RunCommandWithResultAsync(string cmd)
+            => Task.Run(() =>
+            {
+                if (_client == null || !IsConnected) return (string.Empty, -1);
+                try
+                {
+                    using var command = _client.CreateCommand(cmd);
+                    command.CommandTimeout = TimeSpan.FromSeconds(30);
+                    string output = command.Execute() ?? string.Empty;
+                    return (output, command.ExitStatus ?? -1);
+                }
+                catch (Exception ex) { return ($"Error: {ex.Message}", -1); }
+            });
+
+        /// <summary>
+        /// Reads a remote file's content. Supports sudo (password passed via stdin).
+        /// </summary>
+        public Task<(string Content, bool Success)> ReadFileAsync(string path, string sudoPassword = "")
+            => Task.Run(async () =>
+            {
+                string esc = EscapePath(path);
+                string cmd = string.IsNullOrEmpty(sudoPassword)
+                    ? $"cat -- \"{esc}\""
+                    : $"echo '{EscapeShellSingle(sudoPassword)}' | sudo -S cat -- \"{esc}\" 2>/dev/null";
+
+                var (output, exit) = await RunCommandWithResultAsync(cmd);
+                return (output, exit == 0);
+            });
+
+        /// <summary>
+        /// Writes content to a remote file. For sudo writes: writes to a temp file first,
+        /// then uses sudo to copy it to the destination.
+        /// </summary>
+        public async Task<bool> WriteFileAsync(string path, string content, string sudoPassword = "")
+        {
+            string esc = EscapePath(path);
+            string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content));
+
+            if (string.IsNullOrEmpty(sudoPassword))
+            {
+                string cmd = $"echo '{b64}' | base64 -d > \"{esc}\"";
+                var (_, exit) = await RunCommandWithResultAsync(cmd);
+                return exit == 0;
+            }
+            else
+            {
+                // Write to temp file (no sudo needed for /tmp), then sudo-copy to destination.
+                string tmp  = $"/tmp/.pe_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                string pass = EscapeShellSingle(sudoPassword);
+
+                string step1 = $"echo '{b64}' | base64 -d > \"{tmp}\"";
+                var (_, e1) = await RunCommandWithResultAsync(step1);
+                if (e1 != 0) return false;
+
+                string step2 = $"echo '{pass}' | sudo -S cp \"{tmp}\" \"{esc}\" 2>&1 && rm -f \"{tmp}\"";
+                var (out2, e2) = await RunCommandWithResultAsync(step2);
+                if (e2 != 0)
+                {
+                    await RunCommandWithResultAsync($"rm -f \"{tmp}\"");
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        private static string EscapePath(string path)
+            => path.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        private static string EscapeShellSingle(string s)
+            => s.Replace("'", "'\\''");
 
         // ── Key discovery ────────────────────────────────────────────────────
 
