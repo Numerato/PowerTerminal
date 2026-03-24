@@ -42,6 +42,32 @@ namespace PowerTerminal
             // Block F1 help dialog
             CommandBindings.Add(new CommandBinding(ApplicationCommands.Help,
                 (_, e) => e.Handled = true));
+
+            // Rebuild taskbar jump list whenever a connection is added, removed or replaced.
+            Vm.ConnectionManager.Connections.CollectionChanged +=
+                (_, _) => App.RebuildJumpList(Vm.ConnectionManager.Connections);
+
+            // Handle --connect <guid> from a taskbar jump list click.
+            Loaded += OnWindowLoaded;
+        }
+
+        private void OnWindowLoaded(object sender, RoutedEventArgs e)
+        {
+            Loaded -= OnWindowLoaded;
+
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (string.Equals(args[i], "--connect", StringComparison.OrdinalIgnoreCase)
+                    && Guid.TryParse(args[i + 1], out var id))
+                {
+                    var conn = Vm.ConnectionManager.Connections
+                                 .FirstOrDefault(c => c.Id == id);
+                    if (conn != null)
+                        Vm.ConnectToConnection(conn);
+                    break;
+                }
+            }
         }
 
         private void OnVmPropertyChanged(object sender, PropertyChangedEventArgs e)

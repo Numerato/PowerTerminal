@@ -168,63 +168,44 @@
                         BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1"
                         CornerRadius="6"
-                        MinWidth="280"
-                        Padding="0,6">
+                        MinWidth="200"
+                        Padding="0,4">
                   <StackPanel>
 
-                    <!-- Connection list -->
+                    <!-- Connection list — compact icon + name rows -->
                     <ItemsControl ItemsSource="{Binding ConnectionManager.Connections}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <Button Tag="{Binding}"
                                   Click="ConnectItem_Click"
-                                  Style="{StaticResource ConnectPopupItem}">
-                            <Grid>
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="32"/>
-                                <ColumnDefinition Width="*"/>
-                              </Grid.ColumnDefinitions>
+                                  Style="{StaticResource ConnectPopupItem}"
+                                  ToolTip="{Binding}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 
-                              <!-- Icon: logo image when set, otherwise MDL2 server glyph -->
-                              <Border Grid.Column="0"
-                                      Width="24" Height="24"
-                                      CornerRadius="4"
-                                      Background="#22FFFFFF"
-                                      HorizontalAlignment="Center">
-                                <!-- Logo image (when LogoPath is set) -->
-                                <Image Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
-                                       Width="18" Height="18"
-                                       RenderOptions.BitmapScalingMode="HighQuality"
-                                       Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
-                              </Border>
-                              <!-- Fallback glyph (when no logo) -->
-                              <TextBlock Grid.Column="0"
-                                         Text="&#xE8A1;"
+                              <!-- Logo image (when LogoPath is set) -->
+                              <Image Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
+                                     Width="16" Height="16"
+                                     Margin="0,0,8,0"
+                                     VerticalAlignment="Center"
+                                     RenderOptions.BitmapScalingMode="HighQuality"
+                                     Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
+                              <!-- Fallback glyph -->
+                              <TextBlock Text="&#xE8A1;"
                                          FontFamily="Segoe MDL2 Assets"
-                                         FontSize="14"
+                                         FontSize="13"
                                          Foreground="{StaticResource ForegroundDimBrush}"
-                                         HorizontalAlignment="Center"
+                                         Width="16"
+                                         TextAlignment="Center"
                                          VerticalAlignment="Center"
+                                         Margin="0,0,8,0"
                                          Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"/>
 
-                              <!-- Name + host/user subtitle -->
-                              <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}"
-                                           FontSize="13"
-                                           Foreground="{StaticResource ForegroundBrush}"/>
-                                <TextBlock FontSize="11"
-                                           Foreground="{StaticResource ForegroundDimBrush}"
-                                           Margin="0,1,0,0">
-                                  <TextBlock.Text>
-                                    <MultiBinding StringFormat="{}{0}@{1}:{2}">
-                                      <Binding Path="Username"/>
-                                      <Binding Path="Host"/>
-                                      <Binding Path="Port"/>
-                                    </MultiBinding>
-                                  </TextBlock.Text>
-                                </TextBlock>
-                              </StackPanel>
-                            </Grid>
+                              <!-- Name only -->
+                              <TextBlock Text="{Binding Name}"
+                                         FontSize="13"
+                                         VerticalAlignment="Center"
+                                         Foreground="{StaticResource ForegroundBrush}"/>
+                            </StackPanel>
                           </Button>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>

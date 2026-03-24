@@ -106,7 +106,16 @@ namespace PowerTerminal.ViewModels
                 var logoPath = _activeTerminalTab?.LogoPath;
                 if (!string.IsNullOrEmpty(logoPath))
                 {
-                    try { return new BitmapImage(new Uri(logoPath, UriKind.RelativeOrAbsolute)); }
+                    try
+                    {
+                        // Always resolve to an absolute path so BitmapImage is never
+                        // resolved against Environment.CurrentDirectory (which is
+                        // C:\Windows\system32 when launched via a taskbar jump list).
+                        string fullPath = System.IO.Path.IsPathRooted(logoPath)
+                            ? logoPath
+                            : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, logoPath);
+                        return new BitmapImage(new Uri(fullPath, UriKind.Absolute));
+                    }
                     catch { /* fall through to default */ }
                 }
                 return null; // null → WPF uses the Window's own Icon from XAML
