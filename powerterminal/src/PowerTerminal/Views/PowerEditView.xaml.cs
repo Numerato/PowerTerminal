@@ -167,15 +167,30 @@ namespace PowerTerminal.Views
                 ? $" (line {result.Line}, col {result.Column})"
                 : string.Empty;
 
-            var answer = MessageBox.Show(
+            var answer = DarkMessageBox.Show(
+                Window.GetWindow(this),
                 $"Syntax error{location}:\n\n{result.ErrorMessage}\n\nSave anyway?",
                 "Syntax Error",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
-                MessageBoxResult.No);
+                MessageBoxImage.Warning);
 
             if (answer != MessageBoxResult.Yes)
+            {
                 e.Cancel = true;
+                NavigateToError(result.Line, result.Column);
+            }
+        }
+
+        private void NavigateToError(int line, int column)
+        {
+            if (line < 1) return;
+            int targetLine = Math.Max(1, Math.Min(line, Editor.Document.LineCount));
+            var docLine    = Editor.Document.GetLineByNumber(targetLine);
+            int col        = column > 1 ? column - 1 : 0; // col is 1-based; convert to offset
+            int offset     = Math.Min(docLine.Offset + col, docLine.EndOffset);
+            Editor.Select(offset, 0);
+            Editor.ScrollToLine(targetLine);
+            Editor.Focus();
         }
 
         private void OnContentLoaded(object sender, string text)
