@@ -37,8 +37,13 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\Syntax\yaml.xshd" />
-    <EmbeddedResource Include="Resources\Syntax\json.xshd" />
-    <EmbeddedResource Include="Resources\Syntax\markdown.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\bash.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\ini.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\toml.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\dockerfile.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\makefile.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\properties.xshd" />
+    <EmbeddedResource Include="Resources\Syntax\env.xshd" />
   </ItemGroup>
 
   <ItemGroup>

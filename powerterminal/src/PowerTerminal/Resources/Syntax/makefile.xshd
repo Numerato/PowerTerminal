@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SyntaxDefinition name="Makefile" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"   foreground="#6A9955" />
+  <Color name="Target"    foreground="#4EC9B0" fontWeight="bold" />
+  <Color name="Variable"  foreground="#9CDCFE" />
+  <Color name="Keyword"   foreground="#569CD6" fontWeight="bold" />
+  <Color name="Function"  foreground="#DCDCAA" />
+  <Color name="String"    foreground="#CE9178" />
+  <Color name="Automatic" foreground="#C586C0" />
+
+  <RuleSet>
+
+    <!-- Comments -->
+    <Span color="Comment" multiline="false">
+      <Begin>\#</Begin>
+    </Span>
+
+    <!-- Strings -->
+    <Span color="String" multiline="false">
+      <Begin>"</Begin>
+      <End>"</End>
+    </Span>
+    <Span color="String" multiline="false">
+      <Begin>'</Begin>
+      <End>'</End>
+    </Span>
+
+    <!-- Automatic variables: $@, $^, $&lt;, $*, $%, $?, $+ -->
+    <Rule color="Automatic">\$[@\^&lt;&gt;\*%\?\+\|]</Rule>
+
+    <!-- Variable references: $(VAR) and ${VAR} -->
+    <Rule color="Variable">\$[\(\{][a-zA-Z_][a-zA-Z0-9_.\-]*[\)\}]</Rule>
+
+    <!-- Built-in make functions: $(call ...), $(wildcard ...), etc. -->
+    <Rule color="Function">\$\((subst|patsubst|strip|findstring|filter|filter-out|sort|word|words|wordlist|firstword|lastword|dir|notdir|suffix|basename|addsuffix|addprefix|join|wildcard|realpath|abspath|if|or|and|foreach|file|call|value|eval|origin|flavor|shell|error|warning|info)\b</Rule>
+
+    <!-- Directives -->
+    <Keywords color="Keyword">
+      <Word>ifeq</Word>
+      <Word>ifneq</Word>
+      <Word>ifdef</Word>
+      <Word>ifndef</Word>
+      <Word>else</Word>
+      <Word>endif</Word>
+      <Word>include</Word>
+      <Word>sinclude</Word>
+      <Word>define</Word>
+      <Word>endef</Word>
+      <Word>override</Word>
+      <Word>export</Word>
+      <Word>unexport</Word>
+      <Word>vpath</Word>
+    </Keywords>
+
+    <!-- .PHONY, .DEFAULT, .PRECIOUS etc. special targets -->
+    <Rule color="Keyword">^\.[A-Z]+\s*:</Rule>
+
+    <!-- Targets: word at start of line followed by : or :: (not :=) -->
+    <Rule color="Target">^[a-zA-Z_.][a-zA-Z0-9_.\-/%]*\s*:{1,2}(?!=)</Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

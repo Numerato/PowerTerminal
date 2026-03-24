@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SyntaxDefinition name="Dockerfile" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"     foreground="#6A9955" />
+  <Color name="Instruction" foreground="#569CD6" fontWeight="bold" />
+  <Color name="String"      foreground="#CE9178" />
+  <Color name="Variable"    foreground="#9CDCFE" />
+  <Color name="Number"      foreground="#B5CEA8" />
+  <Color name="Flag"        foreground="#4EC9B0" />
+
+  <RuleSet>
+
+    <!-- Comments -->
+    <Span color="Comment" multiline="false">
+      <Begin>\#</Begin>
+    </Span>
+
+    <!-- Double-quoted strings -->
+    <Span color="String" multiline="false">
+      <Begin>"</Begin>
+      <End>"</End>
+      <RuleSet>
+        <Rule color="Variable">\$\{[a-zA-Z_][a-zA-Z0-9_]*\}|\$[a-zA-Z_][a-zA-Z0-9_]*</Rule>
+        <Rule>\\.</Rule>
+      </RuleSet>
+    </Span>
+
+    <!-- Variables: ${VAR} and $VAR -->
+    <Rule color="Variable">\$\{[a-zA-Z_][a-zA-Z0-9_]*\}|\$[a-zA-Z_][a-zA-Z0-9_]*</Rule>
+
+    <!-- --mount, --network, --platform and similar flags -->
+    <Rule color="Flag">--[a-zA-Z][a-zA-Z0-9\-]*</Rule>
+
+    <!-- Dockerfile instructions (case-insensitive handled by rule at start of line) -->
+    <Keywords color="Instruction">
+      <Word>FROM</Word>
+      <Word>RUN</Word>
+      <Word>CMD</Word>
+      <Word>LABEL</Word>
+      <Word>EXPOSE</Word>
+      <Word>ENV</Word>
+      <Word>ADD</Word>
+      <Word>COPY</Word>
+      <Word>ENTRYPOINT</Word>
+      <Word>VOLUME</Word>
+      <Word>USER</Word>
+      <Word>WORKDIR</Word>
+      <Word>ARG</Word>
+      <Word>ONBUILD</Word>
+      <Word>STOPSIGNAL</Word>
+      <Word>HEALTHCHECK</Word>
+      <Word>SHELL</Word>
+      <Word>MAINTAINER</Word>
+      <Word>AS</Word>
+    </Keywords>
+
+    <!-- Port numbers and other numerics -->
+    <Rule color="Number">\b[0-9]+\b</Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

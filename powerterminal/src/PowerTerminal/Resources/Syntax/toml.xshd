@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SyntaxDefinition name="TOML" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"  foreground="#6A9955" />
+  <Color name="Table"    foreground="#C586C0" fontWeight="bold" />
+  <Color name="Key"      foreground="#9CDCFE" />
+  <Color name="String"   foreground="#CE9178" />
+  <Color name="Number"   foreground="#B5CEA8" />
+  <Color name="Keyword"  foreground="#569CD6" />
+  <Color name="Date"     foreground="#4EC9B0" />
+
+  <RuleSet>
+
+    <!-- Comments -->
+    <Span color="Comment" multiline="false">
+      <Begin>\#</Begin>
+    </Span>
+
+    <!-- Multi-line literal strings (''' ... ''') -->
+    <Span color="String" multiline="true">
+      <Begin>'''</Begin>
+      <End>'''</End>
+    </Span>
+
+    <!-- Multi-line basic strings (""" ... """) -->
+    <Span color="String" multiline="true">
+      <Begin>"""</Begin>
+      <End>"""</End>
+    </Span>
+
+    <!-- Basic strings -->
+    <Span color="String" multiline="false">
+      <Begin>"</Begin>
+      <End>"</End>
+      <RuleSet>
+        <Rule>\\.</Rule>
+      </RuleSet>
+    </Span>
+
+    <!-- Literal strings -->
+    <Span color="String" multiline="false">
+      <Begin>'</Begin>
+      <End>'</End>
+    </Span>
+
+    <!-- Table headers: [[array]] and [table] -->
+    <Rule color="Table">^\[{1,2}[^\]]*\]{1,2}</Rule>
+
+    <!-- ISO 8601 dates -->
+    <Rule color="Date">[0-9]{4}-[0-9]{2}-[0-9]{2}([ T][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:[0-9]{2})?)?</Rule>
+
+    <!-- Boolean / special float keywords -->
+    <Keywords color="Keyword">
+      <Word>true</Word>
+      <Word>false</Word>
+      <Word>inf</Word>
+      <Word>nan</Word>
+    </Keywords>
+
+    <!-- Numbers: int, float, hex, octal, binary -->
+    <Rule color="Number">0x[0-9A-Fa-f_]+|0o[0-7_]+|0b[01_]+|-?[0-9][0-9_]*(\.[0-9_]+)?([eE][+-]?[0-9_]+)?\b</Rule>
+
+    <!-- Keys: dotted or plain identifier before = -->
+    <Rule color="Key">^[ \t]*[a-zA-Z_"][a-zA-Z0-9_.\- "]*(?=\s*=)</Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

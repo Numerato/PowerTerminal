@@ -56,9 +56,15 @@ namespace PowerTerminal.Views
         {
             if (_syntaxLoaded) return;
             _syntaxLoaded = true;
-            RegisterDefinition("YAML",     new[] { ".yaml", ".yml" }, "PowerTerminal.Resources.Syntax.yaml.xshd");
-            RegisterDefinition("JSON",     new[] { ".json" },          "PowerTerminal.Resources.Syntax.json.xshd");
-            RegisterDefinition("Markdown", new[] { ".md", ".markdown" }, "PowerTerminal.Resources.Syntax.markdown.xshd");
+            // Custom definitions (not built-in to AvalonEdit)
+            RegisterDefinition("YAML",       new[] { ".yaml", ".yml" },               "PowerTerminal.Resources.Syntax.yaml.xshd");
+            RegisterDefinition("Bash",       new[] { ".sh", ".bash", ".zsh" },        "PowerTerminal.Resources.Syntax.bash.xshd");
+            RegisterDefinition("INI",        new[] { ".ini", ".conf", ".cfg" },       "PowerTerminal.Resources.Syntax.ini.xshd");
+            RegisterDefinition("TOML",       new[] { ".toml" },                        "PowerTerminal.Resources.Syntax.toml.xshd");
+            RegisterDefinition("Dockerfile", new[] { ".dockerfile" },                  "PowerTerminal.Resources.Syntax.dockerfile.xshd");
+            RegisterDefinition("Makefile",   new[] { ".mak", ".mk" },                 "PowerTerminal.Resources.Syntax.makefile.xshd");
+            RegisterDefinition("Properties", new[] { ".properties" },                  "PowerTerminal.Resources.Syntax.properties.xshd");
+            RegisterDefinition("Env",        new[] { ".env" },                         "PowerTerminal.Resources.Syntax.env.xshd");
         }
 
         private static void RegisterDefinition(string name, string[] extensions, string resourceName)
@@ -75,8 +81,46 @@ namespace PowerTerminal.Views
         private void ApplySyntaxHighlighting()
         {
             if (Vm == null) return;
-            string ext = Path.GetExtension(Vm.FilePath).ToLowerInvariant();
-            Editor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinitionByExtension(ext);
+
+            string filename = Path.GetFileName(Vm.FilePath).ToLowerInvariant();
+            string ext      = Path.GetExtension(Vm.FilePath).ToLowerInvariant();
+
+            // Filename-based detection for extension-less files
+            string defName = filename switch
+            {
+                "dockerfile"                                              => "Dockerfile",
+                "makefile" or "gnumakefile" or "bsdmakefile"             => "Makefile",
+                ".bashrc" or ".bash_profile" or ".bash_aliases"
+                    or ".zshrc" or ".zprofile" or ".profile"
+                    or ".bash_logout"                                     => "Bash",
+                ".env"                                                    => "Env",
+                _                                                         => null
+            };
+
+            // Extension-based mapping (covers aliases not registered with HighlightingManager)
+            if (defName == null)
+            {
+                defName = ext switch
+                {
+                    // aliases for built-in definitions
+                    ".htm" or ".xhtml"                         => "HTML",
+                    ".h" or ".hpp" or ".cc" or ".c" or ".hh"  => "C++",
+                    ".ts" or ".tsx" or ".jsx" or ".mjs"        => "JavaScript",
+                    ".scss" or ".less"                         => "CSS",
+                    ".markdown"                                => "MarkDownWithFontSize",
+                    ".pgsql" or ".tsql"                        => "TSQL",
+                    ".psm1" or ".psd1" or ".psm"               => "PowerShell",
+                    // aliases for our custom definitions
+                    ".sh" or ".bash" or ".zsh"                 => "Bash",
+                    ".conf" or ".cfg" or ".config"             => "INI",
+                    ".env"                                     => "Env",
+                    _                                          => null
+                };
+            }
+
+            Editor.SyntaxHighlighting = defName != null
+                ? HighlightingManager.Instance.GetDefinition(defName)
+                : HighlightingManager.Instance.GetDefinitionByExtension(ext);
         }
 
         // ── ViewModel event wiring ──────────────────────────────────────────
