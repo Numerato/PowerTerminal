@@ -26,15 +26,40 @@ namespace PowerTerminal.Services
 
         private static string GetDefaultConfigDir()
         {
-            // Look for config directory relative to the executable
-            string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            string configDir = Path.Combine(exeDir, "config");
-            if (Directory.Exists(configDir))
-                return configDir;
-            // Fallback: user appdata
-            return Path.Combine(
+            // Always store user data in %APPDATA%\PowerTerminal\config so the
+            // location is consistent regardless of where the exe lives (taskbar
+            // pin, publish directory, Debug build, etc.).
+            string appDataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "PowerTerminal", "config");
+
+            // One-time migration: if config files exist next to the exe (old
+            // behaviour) and AppData is empty, copy them across transparently.
+            string exeConfigDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
+            if (Directory.Exists(exeConfigDir) && !Directory.Exists(appDataDir))
+                MigrateConfigDir(exeConfigDir, appDataDir);
+
+            return appDataDir;
+        }
+
+        /// <summary>
+        /// Copies all files from <paramref name="source"/> to <paramref name="dest"/>,
+        /// creating sub-directories as needed. Silently ignores errors so a failed
+        /// migration never prevents startup.
+        /// </summary>
+        private static void MigrateConfigDir(string source, string dest)
+        {
+            try
+            {
+                foreach (string srcFile in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+                {
+                    string relative = Path.GetRelativePath(source, srcFile);
+                    string destFile = Path.Combine(dest, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
+                    File.Copy(srcFile, destFile, overwrite: false);
+                }
+            }
+            catch { /* migration is best-effort; don't crash startup */ }
         }
 
         private void EnsureDirectoriesExist()
@@ -46,6 +71,7 @@ namespace PowerTerminal.Services
 
         public string BaseDir => _baseDir;
         public string WikiDir => Path.Combine(_baseDir, "wikis");
+        // Logs live next to config, under %APPDATA%\PowerTerminal\logs
         public string LogDir => Path.GetFullPath(Path.Combine(_baseDir, "..", "logs"));
 
         // ── Connections ──────────────────────────────────────────────────────────
