@@ -14,9 +14,10 @@ namespace PowerTerminal.Views
             string message,
             string title                = "Information",
             MessageBoxButton buttons    = MessageBoxButton.OK,
-            MessageBoxImage icon        = MessageBoxImage.None)
+            MessageBoxImage icon        = MessageBoxImage.None,
+            MessageBoxResult defaultResult = MessageBoxResult.None)
         {
-            var win = new DarkMessageBoxWindow(title, message, buttons, icon);
+            var win = new DarkMessageBoxWindow(title, message, buttons, icon, defaultResult);
             if (owner != null)
                 win.Owner = owner;
             else
@@ -30,7 +31,8 @@ namespace PowerTerminal.Views
             string message,
             string title                = "Information",
             MessageBoxButton buttons    = MessageBoxButton.OK,
-            MessageBoxImage icon        = MessageBoxImage.None)
-            => Show(null, message, title, buttons, icon);
+            MessageBoxImage icon        = MessageBoxImage.None,
+            MessageBoxResult defaultResult = MessageBoxResult.None)
+            => Show(null, message, title, buttons, icon, defaultResult);
     }
 }

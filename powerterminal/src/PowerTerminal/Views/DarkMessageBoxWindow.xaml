@@ -66,10 +66,10 @@
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="YesButton"    Content="Yes"    Visibility="Collapsed"
                             Style="{StaticResource AccentButton}"
-                            Click="Yes_Click"    Margin="0,0,8,0" MinWidth="72" IsDefault="True"/>
+                            Click="Yes_Click"    Margin="0,0,8,0" MinWidth="72"/>
                     <Button x:Name="OkButton"     Content="OK"     Visibility="Collapsed"
                             Style="{StaticResource AccentButton}"
-                            Click="Ok_Click"     Margin="0,0,8,0" MinWidth="72" IsDefault="True"/>
+                            Click="Ok_Click"     Margin="0,0,8,0" MinWidth="72"/>
                     <Button x:Name="NoButton"     Content="No"     Visibility="Collapsed"
                             Style="{StaticResource FlatButton}"
                             Click="No_Click"     Margin="0,0,8,0" MinWidth="72"/>

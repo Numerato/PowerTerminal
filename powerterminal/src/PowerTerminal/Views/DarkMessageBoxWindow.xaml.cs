@@ -10,13 +10,14 @@ namespace PowerTerminal.Views
 
         public DarkMessageBoxWindow(
             string title, string message,
-            MessageBoxButton buttons, MessageBoxImage icon)
+            MessageBoxButton buttons, MessageBoxImage icon,
+            MessageBoxResult defaultResult = MessageBoxResult.None)
         {
             InitializeComponent();
             TitleText.Text   = title;
             MessageText.Text = message;
             ApplyIcon(icon);
-            ApplyButtons(buttons);
+            ApplyButtons(buttons, defaultResult);
         }
 
         private void ApplyIcon(MessageBoxImage icon)
@@ -47,7 +48,7 @@ namespace PowerTerminal.Views
             }
         }
 
-        private void ApplyButtons(MessageBoxButton buttons)
+        private void ApplyButtons(MessageBoxButton buttons, MessageBoxResult defaultResult)
         {
             switch (buttons)
             {
@@ -66,6 +67,19 @@ namespace PowerTerminal.Views
                     YesButton.Visibility    = Visibility.Visible;
                     NoButton.Visibility     = Visibility.Visible;
                     CancelButton.Visibility = Visibility.Visible;
+                    break;
+            }
+
+            // Apply IsDefault — fall back to the first visible affirmative button
+            switch (defaultResult)
+            {
+                case MessageBoxResult.Yes:    YesButton.IsDefault = true;    break;
+                case MessageBoxResult.No:     NoButton.IsDefault  = true;    break;
+                case MessageBoxResult.Cancel: CancelButton.IsDefault = true; break;
+                case MessageBoxResult.OK:     OkButton.IsDefault  = true;    break;
+                default:
+                    if      (OkButton.Visibility  == Visibility.Visible) OkButton.IsDefault  = true;
+                    else if (YesButton.Visibility == Visibility.Visible) YesButton.IsDefault = true;
                     break;
             }
         }

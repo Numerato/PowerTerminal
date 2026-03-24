@@ -172,7 +172,8 @@ namespace PowerTerminal.Views
                 $"Syntax error{location}:\n\n{result.ErrorMessage}\n\nSave anyway?",
                 "Syntax Error",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
 
             if (answer != MessageBoxResult.Yes)
             {
