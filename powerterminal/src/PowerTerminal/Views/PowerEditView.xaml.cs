@@ -1,7 +1,13 @@
 using System;
+using System.IO;
+using System.Reflection;
+using System.Xml;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Highlighting.Xshd;
 using PowerTerminal.ViewModels;
 
 namespace PowerTerminal.Views
@@ -10,10 +16,67 @@ namespace PowerTerminal.Views
     {
         private PowerEditViewModel Vm => DataContext as PowerEditViewModel;
 
+        // Prevents re-entrancy when loading content from the ViewModel
+        private bool _isLoadingContent;
+
         public PowerEditView()
         {
             InitializeComponent();
+            EnsureSyntaxDefinitionsLoaded();
+
+            // Dark-theme caret and selection colours (cannot be set in XAML for AvalonEdit)
+            Editor.TextArea.Caret.CaretBrush = System.Windows.Media.Brushes.White;
+            Editor.TextArea.SelectionBrush   = new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromArgb(120, 92, 40, 0));
+            Editor.TextArea.SelectionForeground = System.Windows.Media.Brushes.White;
+
+            // Push document changes to the ViewModel
+            Editor.Document.Changed += (_, _) =>
+            {
+                if (!_isLoadingContent && Vm != null)
+                    Vm.Content = Editor.Document.Text;
+            };
+
+            // Update cursor position in status bar
+            Editor.TextArea.Caret.PositionChanged += (_, _) =>
+            {
+                if (Vm == null) return;
+                Vm.CursorLine = Editor.TextArea.Caret.Line;
+                Vm.CursorCol  = Editor.TextArea.Caret.Column;
+            };
+
             DataContextChanged += (_, _) => BindVmEvents();
+        }
+
+        // ── Syntax highlighting registration ───────────────────────────────
+
+        private static bool _syntaxLoaded;
+
+        private static void EnsureSyntaxDefinitionsLoaded()
+        {
+            if (_syntaxLoaded) return;
+            _syntaxLoaded = true;
+            RegisterDefinition("YAML",     new[] { ".yaml", ".yml" }, "PowerTerminal.Resources.Syntax.yaml.xshd");
+            RegisterDefinition("JSON",     new[] { ".json" },          "PowerTerminal.Resources.Syntax.json.xshd");
+            RegisterDefinition("Markdown", new[] { ".md", ".markdown" }, "PowerTerminal.Resources.Syntax.markdown.xshd");
+        }
+
+        private static void RegisterDefinition(string name, string[] extensions, string resourceName)
+        {
+            if (HighlightingManager.Instance.GetDefinition(name) != null) return;
+            var asm = Assembly.GetExecutingAssembly();
+            using var stream = asm.GetManifestResourceStream(resourceName);
+            if (stream == null) return;
+            using var reader = new XmlTextReader(stream);
+            var def = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+            HighlightingManager.Instance.RegisterHighlighting(name, extensions, def);
+        }
+
+        private void ApplySyntaxHighlighting()
+        {
+            if (Vm == null) return;
+            string ext = Path.GetExtension(Vm.FilePath).ToLowerInvariant();
+            Editor.SyntaxHighlighting = HighlightingManager.Instance.GetDefinitionByExtension(ext);
         }
 
         // ── ViewModel event wiring ──────────────────────────────────────────
@@ -24,6 +87,7 @@ namespace PowerTerminal.Views
         {
             if (_lastVm != null)
             {
+                _lastVm.ContentLoaded       -= OnContentLoaded;
                 _lastVm.FindNextRequested   -= OnFindNext;
                 _lastVm.FindPrevRequested   -= OnFindPrev;
                 _lastVm.ReplaceOneRequested -= OnReplaceOne;
@@ -36,6 +100,7 @@ namespace PowerTerminal.Views
             _lastVm = Vm;
             if (_lastVm == null) return;
 
+            _lastVm.ContentLoaded       += OnContentLoaded;
             _lastVm.FindNextRequested   += OnFindNext;
             _lastVm.FindPrevRequested   += OnFindPrev;
             _lastVm.ReplaceOneRequested += OnReplaceOne;
@@ -44,6 +109,15 @@ namespace PowerTerminal.Views
             _lastVm.TimeDateRequested   += OnTimeDate;
             _lastVm.FontChangeRequested += OnFontChange;
             _lastVm.SaveAsRequested     += OnSaveAs;
+        }
+
+        private void OnContentLoaded(object sender, string text)
+        {
+            _isLoadingContent = true;
+            Editor.Document.Text = text;
+            Editor.Document.UndoStack.ClearAll();
+            _isLoadingContent = false;
+            ApplySyntaxHighlighting();
         }
 
         // ── Keyboard shortcuts ─────────────────────────────────────────────
@@ -66,7 +140,7 @@ namespace PowerTerminal.Views
 
         private void Editor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Let Ctrl+Z/Y pass through to the TextBox's built-in undo/redo
+            // AvalonEdit handles Ctrl+Z/Y natively via its undo stack
         }
 
         private void SearchBox_KeyDown(object sender, KeyEventArgs e)
@@ -79,23 +153,6 @@ namespace PowerTerminal.Views
         {
             if (e.Key == Key.Enter) { OnReplaceOne(null, null); e.Handled = true; }
             if (e.Key == Key.Escape) { Vm?.HideFindCommand.Execute(null); Editor.Focus(); }
-        }
-
-        // ── Status bar — cursor position ──────────────────────────────────
-
-        private void Editor_SelectionChanged(object sender, RoutedEventArgs e)
-        {
-            if (Vm == null) return;
-            int idx = Editor.SelectionStart;
-            string text = Editor.Text ?? string.Empty;
-            int line = 1, col = 1;
-            for (int i = 0; i < idx && i < text.Length; i++)
-            {
-                if (text[i] == '\n') { line++; col = 1; }
-                else col++;
-            }
-            Vm.CursorLine = line;
-            Vm.CursorCol  = col;
         }
 
         // ── Find / Replace ────────────────────────────────────────────────
@@ -114,7 +171,7 @@ namespace PowerTerminal.Views
 
         private void DoFind(bool forward)
         {
-            string text   = Editor.Text ?? string.Empty;
+            string text   = Editor.Document.Text;
             string search = Vm.SearchText;
             var comparison = Vm.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
@@ -128,33 +185,24 @@ namespace PowerTerminal.Views
             if (forward)
             {
                 idx = text.IndexOf(search, Math.Max(0, startFrom), comparison);
-                if (idx < 0) // wrap around
+                if (idx < 0)
                     idx = text.IndexOf(search, 0, comparison);
             }
             else
             {
                 int from = Math.Max(0, Math.Min(startFrom, text.Length - 1));
-                // Search backwards from 'from'
                 for (int i = from; i >= 0; i--)
                 {
-                    if (i + search.Length <= text.Length)
-                    {
-                        if (string.Compare(text, i, search, 0, search.Length, comparison) == 0)
-                        {
-                            idx = i;
-                            break;
-                        }
-                    }
+                    if (i + search.Length <= text.Length &&
+                        string.Compare(text, i, search, 0, search.Length, comparison) == 0)
+                    { idx = i; break; }
                 }
-                if (idx < 0) // wrap around to end
+                if (idx < 0)
                 {
                     for (int i = text.Length - search.Length; i >= 0; i--)
                     {
                         if (string.Compare(text, i, search, 0, search.Length, comparison) == 0)
-                        {
-                            idx = i;
-                            break;
-                        }
+                        { idx = i; break; }
                     }
                 }
             }
@@ -162,7 +210,7 @@ namespace PowerTerminal.Views
             if (idx >= 0)
             {
                 Editor.Select(idx, search.Length);
-                Editor.ScrollToLine(GetLineNumber(text, idx));
+                Editor.ScrollToLine(Editor.Document.GetLineByOffset(idx).LineNumber);
                 Editor.Focus();
             }
         }
@@ -171,15 +219,12 @@ namespace PowerTerminal.Views
         {
             if (Vm == null || string.IsNullOrEmpty(Vm.SearchText) || Vm.IsReadOnly) return;
             var comparison = Vm.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            string selected = Editor.SelectedText;
-            if (string.Equals(selected, Vm.SearchText, comparison))
+            if (string.Equals(Editor.SelectedText, Vm.SearchText, comparison))
             {
-                // Replace current selection
                 int start = Editor.SelectionStart;
-                Editor.SelectedText = Vm.ReplaceText;
+                Editor.Document.Replace(start, Editor.SelectionLength, Vm.ReplaceText);
                 Editor.Select(start, Vm.ReplaceText.Length);
             }
-            // Move to next occurrence
             DoFind(forward: true);
         }
 
@@ -187,17 +232,16 @@ namespace PowerTerminal.Views
         {
             if (Vm == null || string.IsNullOrEmpty(Vm.SearchText) || Vm.IsReadOnly) return;
             var comparison = Vm.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            string text  = Editor.Text ?? string.Empty;
+            string text  = Editor.Document.Text;
             string newText;
             int count = 0;
 
             if (comparison == StringComparison.Ordinal)
             {
                 newText = text.Replace(Vm.SearchText, Vm.ReplaceText, StringComparison.Ordinal);
-                // Count occurrences
-                int idx = 0;
-                while ((idx = text.IndexOf(Vm.SearchText, idx, StringComparison.Ordinal)) >= 0)
-                { count++; idx += Vm.SearchText.Length; }
+                int i = 0;
+                while ((i = text.IndexOf(Vm.SearchText, i, StringComparison.Ordinal)) >= 0)
+                { count++; i += Vm.SearchText.Length; }
             }
             else
             {
@@ -214,7 +258,7 @@ namespace PowerTerminal.Views
             if (count > 0)
             {
                 int pos = Editor.SelectionStart;
-                Editor.Text = newText;
+                Editor.Document.Text = newText;
                 Editor.SelectionStart = Math.Min(pos, newText.Length);
             }
         }
@@ -226,11 +270,9 @@ namespace PowerTerminal.Views
             var win = new GoToLineWindow(Vm?.CursorLine ?? 1) { Owner = Window.GetWindow(this) };
             if (win.ShowDialog() == true)
             {
-                int targetLine = win.LineNumber;
-                string text = Editor.Text ?? string.Empty;
-                int idx = GetIndexOfLine(text, targetLine);
-                Editor.SelectionStart  = idx;
-                Editor.SelectionLength = 0;
+                int targetLine = Math.Max(1, Math.Min(win.LineNumber, Editor.Document.LineCount));
+                var line = Editor.Document.GetLineByNumber(targetLine);
+                Editor.Select(line.Offset, 0);
                 Editor.ScrollToLine(targetLine);
                 Editor.Focus();
             }
@@ -243,9 +285,8 @@ namespace PowerTerminal.Views
             if (Vm?.IsReadOnly == true) return;
             string stamp = DateTime.Now.ToString("HH:mm  dd/MM/yyyy");
             int start = Editor.SelectionStart;
-            Editor.SelectedText = stamp;
-            Editor.SelectionStart  = start + stamp.Length;
-            Editor.SelectionLength = 0;
+            Editor.Document.Replace(start, Editor.SelectionLength, stamp);
+            Editor.Select(start + stamp.Length, 0);
         }
 
         // ── Font change ───────────────────────────────────────────────────
@@ -284,8 +325,6 @@ namespace PowerTerminal.Views
 
         public void FocusEditor()
         {
-            // Defer focus until after the layout pass so the newly-visible
-            // editor has been measured and is ready to accept keyboard focus.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
                 new Action(() =>
                 {
@@ -298,27 +337,6 @@ namespace PowerTerminal.Views
         {
             SearchBox.Focus();
             SearchBox.SelectAll();
-        }
-
-        // ── Utility ───────────────────────────────────────────────────────
-
-        private static int GetLineNumber(string text, int charIndex)
-        {
-            int line = 1;
-            for (int i = 0; i < charIndex && i < text.Length; i++)
-                if (text[i] == '\n') line++;
-            return line;
-        }
-
-        private static int GetIndexOfLine(string text, int lineNumber)
-        {
-            int line = 1, i = 0;
-            while (i < text.Length && line < lineNumber)
-            {
-                if (text[i] == '\n') line++;
-                i++;
-            }
-            return i;
         }
     }
 }

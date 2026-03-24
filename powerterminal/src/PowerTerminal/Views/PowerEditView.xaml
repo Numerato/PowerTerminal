@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
+             xmlns:avalonEdit="clr-namespace:ICSharpCode.AvalonEdit;assembly=ICSharpCode.AvalonEdit"
              Background="#1a1a1a"
              FontFamily="{Binding FontFamily}"
              FontSize="{Binding FontSize}"
@@ -257,28 +258,22 @@
             </Grid>
         </Border>
 
-        <!-- ── Main text editor ─────────────────────────────────────────── -->
-        <TextBox x:Name="Editor"
+        <!-- ── Main text editor (AvalonEdit) ────────────────────────────────── -->
+        <avalonEdit:TextEditor
+                 x:Name="Editor"
                  Grid.Row="2"
-                 Height="Auto"
-                 AcceptsReturn="True"
-                 AcceptsTab="True"
-                 TextWrapping="{Binding TextWrappingMode}"
-                 HorizontalScrollBarVisibility="{Binding HScrollVisibility}"
-                 VerticalScrollBarVisibility="Auto"
                  FontFamily="{Binding FontFamily}"
                  FontSize="{Binding FontSize}"
                  Background="#1a1a1a"
                  Foreground="#d4d4d4"
-                 CaretBrush="White"
-                 SelectionBrush="{StaticResource SelectionBrush}"
-                 SelectionTextBrush="White"
                  BorderThickness="0"
                  Padding="5,8"
-                 SpellCheck.IsEnabled="False"
-                 Text="{Binding Content, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 SelectionChanged="Editor_SelectionChanged"
-                 PreviewKeyDown="Editor_PreviewKeyDown"/>
+                 ShowLineNumbers="True"
+                 LineNumbersForeground="#555555"
+                 WordWrap="{Binding WordWrap}"
+                 IsReadOnly="{Binding IsReadOnly}"
+                 HorizontalScrollBarVisibility="{Binding HScrollVisibility}"
+                 VerticalScrollBarVisibility="Auto"/>
 
         <!-- ── Status bar ────────────────────────────────────────────────── -->
         <StatusBar Grid.Row="3"

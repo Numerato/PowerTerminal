@@ -40,6 +40,8 @@ namespace PowerTerminal.ViewModels
         public event EventHandler FindPrevRequested;
         public event EventHandler ReplaceOneRequested;
         public event EventHandler ReplaceAllRequested;
+        /// <summary>Fired by <see cref="LoadContent"/> so the view can update the editor without marking the file modified.</summary>
+        public event EventHandler<string> ContentLoaded;
 
         public PowerEditViewModel()
         {
@@ -177,6 +179,7 @@ namespace PowerTerminal.ViewModels
             OnPropertyChanged(nameof(Content));
             IsModified = false;
             OnPropertyChanged(nameof(TitleText));
+            ContentLoaded?.Invoke(this, text);
         }
 
         public async Task<bool> SaveAsync()
