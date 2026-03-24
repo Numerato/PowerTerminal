@@ -288,7 +288,7 @@ namespace PowerTerminal.Views
                 PowerEditor.Visibility  = Visibility.Collapsed;
                 PowerEditor.DataContext = null;
                 Terminal.Visibility     = Visibility.Visible;
-                TerminalScrollBar.Visibility = Visibility.Visible;
+                TerminalScrollBar.Visibility = Terminal.ScrollbackCount > 0 ? Visibility.Visible : Visibility.Collapsed;
                 FocusTerminal();
             });
             // Bash already has a prompt from running the silent poweredit script — no \r needed
@@ -322,7 +322,7 @@ namespace PowerTerminal.Views
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (_vm?.IsActive == true) FocusTerminal();
+            if (_vm?.IsActive == true) FocusActiveView();
 
             if (_vm?.AutoConnectOnLoad == true)
             {
@@ -334,6 +334,18 @@ namespace PowerTerminal.Views
         private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (e.NewValue is true)
+                FocusActiveView();
+        }
+
+        /// <summary>
+        /// Focuses whichever content is currently visible in the tab:
+        /// the PowerEditor (if open) or the Terminal.
+        /// </summary>
+        private void FocusActiveView()
+        {
+            if (PowerEditor.Visibility == Visibility.Visible)
+                PowerEditor.FocusEditor();
+            else
                 FocusTerminal();
         }
 
