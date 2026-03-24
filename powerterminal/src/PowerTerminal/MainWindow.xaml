@@ -173,7 +173,8 @@
                   <StackPanel>
 
                     <!-- Connection list — compact icon + name rows -->
-                    <ItemsControl ItemsSource="{Binding ConnectionManager.Connections}">
+                    <ItemsControl ItemsSource="{Binding PlacementTarget.DataContext.ConnectionManager.Connections,
+                                                   RelativeSource={RelativeSource AncestorType=Popup}}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <Button Tag="{Binding}"
@@ -216,7 +217,8 @@
                                Foreground="{StaticResource ForegroundDimBrush}"
                                FontSize="11"
                                Padding="14,6"
-                               Visibility="{Binding ConnectionManager.Connections.Count,
+                               Visibility="{Binding PlacementTarget.DataContext.ConnectionManager.Connections.Count,
+                                                   RelativeSource={RelativeSource AncestorType=Popup},
                                                    Converter={StaticResource ZeroCountToVisConverter}}" />
 
                     <Separator Margin="4,4" Background="{StaticResource BorderBrush}"/>
