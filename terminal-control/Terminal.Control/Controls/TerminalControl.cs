@@ -9,6 +9,15 @@ using System.Windows.Threading;
 using Terminal.Vt;
 using Terminal.Ssh;
 
+/// <summary>Controls how copy and paste work in the terminal panel.</summary>
+public enum TerminalCopyPasteMode
+{
+    /// <summary>Left-drag selects and auto-copies to clipboard; right-click pastes immediately.</summary>
+    Classic,
+    /// <summary>Right-click opens a popup menu with Copy and Paste items (default).</summary>
+    RightClickMenu
+}
+
 public sealed class TerminalControl : FrameworkElement
 {
     public static readonly DependencyProperty FontSizeProperty =
@@ -113,6 +122,9 @@ public sealed class TerminalControl : FrameworkElement
     /// <summary>Fired when a "poweredit &lt;file&gt;" command is intercepted. Arg is the full command string.</summary>
     public event EventHandler<string>? PowerEditCommand;
 
+    /// <summary>Controls copy/paste interaction model in the terminal.</summary>
+    public TerminalCopyPasteMode CopyPasteMode { get; set; } = TerminalCopyPasteMode.RightClickMenu;
+
     public TerminalControl()
     {
         Focusable = true;
@@ -132,6 +144,8 @@ public sealed class TerminalControl : FrameworkElement
         menu.Items.Add(copyItem);
         menu.Items.Add(pasteItem);
         ContextMenu = menu;
+        // Suppress context menu opening when in Classic mode
+        ContextMenuOpening += (_, e) => { if (CopyPasteMode == TerminalCopyPasteMode.Classic) e.Handled = true; };
     }
 
     public void AttachSession(ISshTerminalSession session)
@@ -783,6 +797,13 @@ public sealed class TerminalControl : FrameworkElement
             e.Handled = true;
             return;
         }
+        if (e.ChangedButton == MouseButton.Right && CopyPasteMode == TerminalCopyPasteMode.Classic
+            && _emulator?.MouseMode == MouseMode.None)
+        {
+            PasteFromClipboard();
+            e.Handled = true;
+            return;
+        }
         if (_emulator?.MouseMode != MouseMode.None)
         {
             SendMouseEvent(e.GetPosition(this), e.ChangedButton, true);
@@ -802,6 +823,10 @@ public sealed class TerminalControl : FrameworkElement
             {
                 _selStart = null;
                 _selEnd = null;
+            }
+            else if (CopyPasteMode == TerminalCopyPasteMode.Classic)
+            {
+                CopySelection();
             }
             QueueRender();
             e.Handled = true;

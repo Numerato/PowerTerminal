@@ -191,6 +191,30 @@
                                     Foreground="{StaticResource ForegroundBrush}"
                                     Margin="0,0"/>
                         </StackPanel>
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- Terminal Behavior -->
+                        <TextBlock Text="Terminal Behavior"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <TextBlock Text="Copy / Paste mode:"
+                                   Foreground="{StaticResource ForegroundBrush}"
+                                   Margin="0,0,0,6"/>
+
+                        <RadioButton x:Name="CopyPasteModeRightClick"
+                                     GroupName="CopyPasteMode"
+                                     Content="Right-click menu  (Copy and Paste menu on right-click)"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     Margin="10,0,0,4"/>
+
+                        <RadioButton x:Name="CopyPasteModeClassic"
+                                     GroupName="CopyPasteMode"
+                                     Content="Classic  (drag to select &amp; auto-copy; right-click pastes)"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     Margin="10,0,0,8"/>
                     </StackPanel>
                 </ScrollViewer>
 

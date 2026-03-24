@@ -29,6 +29,9 @@ namespace PowerTerminal.ViewModels
         /// <summary>When true the terminal intercepts "poweredit &lt;file&gt;" commands instead of forwarding them to the shell.</summary>
         public bool EnablePowerEdit { get; set; }
 
+        /// <summary>Determines how copy and paste work in the terminal panel.</summary>
+        public Models.TerminalCopyPasteMode CopyPasteMode { get; set; } = Models.TerminalCopyPasteMode.RightClickMenu;
+
         /// <summary>SSH keys folder passed to <see cref="SshService"/>.</summary>
         public string SshKeysFolder { get; set; } =
             System.IO.Path.Combine(

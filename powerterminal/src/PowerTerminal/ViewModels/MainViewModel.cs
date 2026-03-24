@@ -164,7 +164,8 @@ namespace PowerTerminal.ViewModels
                 Connection      = connection,
                 Header          = connection.Name,
                 Theme           = settings.Theme,
-                EnablePowerEdit = settings.EnablePowerEdit
+                EnablePowerEdit = settings.EnablePowerEdit,
+                CopyPasteMode   = settings.TerminalCopyPasteMode
             };
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
@@ -178,7 +179,8 @@ namespace PowerTerminal.ViewModels
             {
                 Connection      = connection,
                 Header          = connection.Name,
-                EnablePowerEdit = settings.EnablePowerEdit
+                EnablePowerEdit = settings.EnablePowerEdit,
+                CopyPasteMode   = settings.TerminalCopyPasteMode
             };
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
@@ -200,7 +202,8 @@ namespace PowerTerminal.ViewModels
                 AutoConnectOnLoad = true,
                 SshKeysFolder     = settings.SshKeysFolder,
                 Theme             = settings.Theme,
-                EnablePowerEdit   = settings.EnablePowerEdit
+                EnablePowerEdit   = settings.EnablePowerEdit,
+                CopyPasteMode     = settings.TerminalCopyPasteMode
                 // InlinePasswordCollector is wired by TerminalTabView.OnDataContextChanged
                 // when the tab's view is created — no popup dialog needed.
             };

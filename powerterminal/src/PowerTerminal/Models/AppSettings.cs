@@ -2,6 +2,15 @@ using System;
 
 namespace PowerTerminal.Models
 {
+    /// <summary>Controls how copy and paste work in the terminal panel.</summary>
+    public enum TerminalCopyPasteMode
+    {
+        /// <summary>Left-drag selects and auto-copies; right-click pastes immediately.</summary>
+        Classic,
+        /// <summary>Right-click opens a popup menu with Copy and Paste items.</summary>
+        RightClickMenu
+    }
+
     public class AppSettings
     {
         public AiSettings Ai { get; set; } = new();
@@ -22,6 +31,9 @@ namespace PowerTerminal.Models
 
         /// <summary>When true, the PowerEdit enhanced editing features are active.</summary>
         public bool EnablePowerEdit { get; set; } = true;
+
+        /// <summary>Controls copy/paste behaviour in the terminal (Classic or RightClickMenu).</summary>
+        public TerminalCopyPasteMode TerminalCopyPasteMode { get; set; } = TerminalCopyPasteMode.RightClickMenu;
     }
 
     public class AiSettings

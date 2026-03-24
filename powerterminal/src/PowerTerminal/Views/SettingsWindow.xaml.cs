@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
+using PowerTerminal.Models;
 using PowerTerminal.Services;
 using System.Globalization;
 
@@ -27,6 +28,8 @@ namespace PowerTerminal.Views
         {
             var s = _config.LoadSettings();
             DebugLoggingCheck.IsChecked = s.EnableDebugLogging;
+            CopyPasteModeClassic.IsChecked    = s.TerminalCopyPasteMode == TerminalCopyPasteMode.Classic;
+            CopyPasteModeRightClick.IsChecked = s.TerminalCopyPasteMode == TerminalCopyPasteMode.RightClickMenu;
             ApiBaseUrl.Text         = s.Ai.ApiBaseUrl;
             ApiToken.Password       = s.Ai.ApiToken;
             ModelName.Text          = s.Ai.Model;
@@ -41,6 +44,9 @@ namespace PowerTerminal.Views
         {
             var s = _config.LoadSettings();
             s.EnableDebugLogging = DebugLoggingCheck.IsChecked == true;
+            s.TerminalCopyPasteMode = CopyPasteModeClassic.IsChecked == true
+                ? TerminalCopyPasteMode.Classic
+                : TerminalCopyPasteMode.RightClickMenu;
             s.Ai.ApiBaseUrl    = ApiBaseUrl.Text.Trim();
             s.Ai.ApiToken      = ApiToken.Password;
             s.Ai.Model         = ModelName.Text.Trim();

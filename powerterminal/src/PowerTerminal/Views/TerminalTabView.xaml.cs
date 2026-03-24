@@ -43,6 +43,7 @@ namespace PowerTerminal.Views
             if (_vm == null) return;
 
             Terminal.EnablePowerEdit = _vm.EnablePowerEdit;
+            Terminal.CopyPasteMode   = (Terminal.Controls.TerminalCopyPasteMode)_vm.CopyPasteMode;
 
             _attachHandler = (_, session) =>
             {
