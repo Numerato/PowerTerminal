@@ -151,7 +151,7 @@
                       Click="ConnectBtn_Click"
                       WindowChrome.IsHitTestVisibleInChrome="True"
                       Padding="8,6"
-                      ToolTip="Open a connection">
+                      ToolTip="{Binding ConnectionManager.Connections.Count, StringFormat='Open a connection ({0} configured)'}">
                 <!-- White "+" new-tab icon -->
                 <TextBlock Text="+"
                            FontSize="18"

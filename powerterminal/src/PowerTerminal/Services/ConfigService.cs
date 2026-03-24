@@ -81,8 +81,11 @@ namespace PowerTerminal.Services
         {
             try
             {
+                string connPath = Path.Combine(_baseDir, "connections.json");
+                bool   exists   = File.Exists(connPath);
+                int    count    = exists ? (LoadConnections().Count) : -1;
                 string diagFile = Path.Combine(logDir, "startup.log");
-                string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] BaseDir={_baseDir} | Exe={AppDomain.CurrentDomain.BaseDirectory}";
+                string entry    = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] BaseDir={_baseDir} | Connections={count} | Exe={AppDomain.CurrentDomain.BaseDirectory}";
                 File.AppendAllText(diagFile, entry + Environment.NewLine);
             }
             catch { /* diagnostic writes must never crash the app */ }
