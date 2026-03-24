@@ -42,6 +42,11 @@ namespace PowerTerminal.ViewModels
         public event EventHandler ReplaceAllRequested;
         /// <summary>Fired by <see cref="LoadContent"/> so the view can update the editor without marking the file modified.</summary>
         public event EventHandler<string> ContentLoaded;
+        /// <summary>
+        /// Fired before any save. Set <see cref="System.ComponentModel.CancelEventArgs.Cancel"/> to true to abort the save.
+        /// The view uses this to run syntax validation and ask the user whether to proceed.
+        /// </summary>
+        public event EventHandler<System.ComponentModel.CancelEventArgs> BeforeSave;
 
         public PowerEditViewModel()
         {
@@ -185,6 +190,9 @@ namespace PowerTerminal.ViewModels
         public async Task<bool> SaveAsync()
         {
             if (IsReadOnly || WriteFile == null) return false;
+            var args = new System.ComponentModel.CancelEventArgs();
+            BeforeSave?.Invoke(this, args);
+            if (args.Cancel) return false;
             bool ok = await WriteFile(FilePath, _content, UseSudo ? SudoPassword : string.Empty);
             if (ok) IsModified = false;
             return ok;
@@ -193,11 +201,14 @@ namespace PowerTerminal.ViewModels
         public async Task<bool> SaveToPathAsync(string newPath)
         {
             if (WriteFile == null) return false;
+            var args = new System.ComponentModel.CancelEventArgs();
+            BeforeSave?.Invoke(this, args);
+            if (args.Cancel) return false;
             bool ok = await WriteFile(newPath, _content, UseSudo ? SudoPassword : string.Empty);
             if (ok)
             {
                 FilePath   = newPath;
-                IsReadOnly = false;   // saved successfully to a writable path — no longer read-only
+                IsReadOnly = false;
                 IsModified = false;
             }
             return ok;

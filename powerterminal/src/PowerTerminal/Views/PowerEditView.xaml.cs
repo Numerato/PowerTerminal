@@ -132,6 +132,7 @@ namespace PowerTerminal.Views
             if (_lastVm != null)
             {
                 _lastVm.ContentLoaded       -= OnContentLoaded;
+                _lastVm.BeforeSave          -= OnBeforeSave;
                 _lastVm.FindNextRequested   -= OnFindNext;
                 _lastVm.FindPrevRequested   -= OnFindPrev;
                 _lastVm.ReplaceOneRequested -= OnReplaceOne;
@@ -145,6 +146,7 @@ namespace PowerTerminal.Views
             if (_lastVm == null) return;
 
             _lastVm.ContentLoaded       += OnContentLoaded;
+            _lastVm.BeforeSave          += OnBeforeSave;
             _lastVm.FindNextRequested   += OnFindNext;
             _lastVm.FindPrevRequested   += OnFindPrev;
             _lastVm.ReplaceOneRequested += OnReplaceOne;
@@ -153,6 +155,27 @@ namespace PowerTerminal.Views
             _lastVm.TimeDateRequested   += OnTimeDate;
             _lastVm.FontChangeRequested += OnFontChange;
             _lastVm.SaveAsRequested     += OnSaveAs;
+        }
+
+        private void OnBeforeSave(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (Vm == null) return;
+            var result = Services.SyntaxValidationService.Validate(Vm.Content, Vm.FilePath);
+            if (result.IsValid) return;
+
+            string location = result.Line > 0
+                ? $" (line {result.Line}, col {result.Column})"
+                : string.Empty;
+
+            var answer = MessageBox.Show(
+                $"Syntax error{location}:\n\n{result.ErrorMessage}\n\nSave anyway?",
+                "Syntax Error",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+
+            if (answer != MessageBoxResult.Yes)
+                e.Cancel = true;
         }
 
         private void OnContentLoaded(object sender, string text)
