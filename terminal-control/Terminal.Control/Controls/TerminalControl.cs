@@ -800,7 +800,19 @@ public sealed class TerminalControl : FrameworkElement
         if (e.ChangedButton == MouseButton.Right && CopyPasteMode == TerminalCopyPasteMode.Classic
             && _emulator?.MouseMode == MouseMode.None)
         {
-            PasteFromClipboard();
+            if (_selStart != null && _selEnd != null && _selStart != _selEnd)
+            {
+                // Selection exists → copy it and clear
+                CopySelection();
+                _selStart = null;
+                _selEnd = null;
+                QueueRender();
+            }
+            else
+            {
+                // No selection → paste
+                PasteFromClipboard();
+            }
             e.Handled = true;
             return;
         }
@@ -823,10 +835,6 @@ public sealed class TerminalControl : FrameworkElement
             {
                 _selStart = null;
                 _selEnd = null;
-            }
-            else if (CopyPasteMode == TerminalCopyPasteMode.Classic)
-            {
-                CopySelection();
             }
             QueueRender();
             e.Handled = true;
