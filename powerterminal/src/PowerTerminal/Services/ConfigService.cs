@@ -33,19 +33,19 @@ namespace PowerTerminal.Services
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "PowerTerminal", "config");
 
-            // One-time migration: if config files exist next to the exe (old
-            // behaviour) and AppData is empty, copy them across transparently.
+            // Migration: copy any files from the exe-local config directory that
+            // are NOT yet present in AppData. Runs every startup so files added
+            // while running from the dev build are picked up automatically.
             string exeConfigDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config");
-            if (Directory.Exists(exeConfigDir) && !Directory.Exists(appDataDir))
+            if (Directory.Exists(exeConfigDir))
                 MigrateConfigDir(exeConfigDir, appDataDir);
 
             return appDataDir;
         }
 
         /// <summary>
-        /// Copies all files from <paramref name="source"/> to <paramref name="dest"/>,
-        /// creating sub-directories as needed. Silently ignores errors so a failed
-        /// migration never prevents startup.
+        /// Copies files from <paramref name="source"/> to <paramref name="dest"/> that are
+        /// either absent in the destination or older than the source. Silently ignores errors.
         /// </summary>
         private static void MigrateConfigDir(string source, string dest)
         {
@@ -56,7 +56,12 @@ namespace PowerTerminal.Services
                     string relative = Path.GetRelativePath(source, srcFile);
                     string destFile = Path.Combine(dest, relative);
                     Directory.CreateDirectory(Path.GetDirectoryName(destFile)!);
-                    File.Copy(srcFile, destFile, overwrite: false);
+                    // Only overwrite if the source is newer — preserves edits made in AppData.
+                    if (!File.Exists(destFile) ||
+                        File.GetLastWriteTimeUtc(srcFile) > File.GetLastWriteTimeUtc(destFile))
+                    {
+                        File.Copy(srcFile, destFile, overwrite: true);
+                    }
                 }
             }
             catch { /* migration is best-effort; don't crash startup */ }
@@ -66,7 +71,21 @@ namespace PowerTerminal.Services
         {
             Directory.CreateDirectory(_baseDir);
             Directory.CreateDirectory(Path.Combine(_baseDir, "wikis"));
-            Directory.CreateDirectory(Path.Combine(_baseDir, "..", "logs"));
+            string logDir = Path.GetFullPath(Path.Combine(_baseDir, "..", "logs"));
+            Directory.CreateDirectory(logDir);
+            WriteStartupDiagnostic(logDir);
+        }
+
+        /// <summary>Always writes a brief startup entry to help diagnose config-path issues.</summary>
+        private void WriteStartupDiagnostic(string logDir)
+        {
+            try
+            {
+                string diagFile = Path.Combine(logDir, "startup.log");
+                string entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] BaseDir={_baseDir} | Exe={AppDomain.CurrentDomain.BaseDirectory}";
+                File.AppendAllText(diagFile, entry + Environment.NewLine);
+            }
+            catch { /* diagnostic writes must never crash the app */ }
         }
 
         public string BaseDir => _baseDir;
