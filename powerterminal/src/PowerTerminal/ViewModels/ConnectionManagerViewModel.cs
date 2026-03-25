@@ -25,6 +25,15 @@ namespace PowerTerminal.ViewModels
             CancelCommand = new RelayCommand(_ => CancelEdit(), _ => Editing != null);
 
             LoadIconOptions();
+
+            // Auto-select the first connection so the form is immediately populated.
+            if (Connections.Count > 0)
+            {
+                _suppressAutoEdit = true;
+                Selected = Connections[0];
+                _suppressAutoEdit = false;
+                StartEdit();
+            }
         }
 
         public ObservableCollection<SshConnection> Connections { get; }

@@ -3,11 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
         Height="560" Width="720"
-        MinHeight="440" MinWidth="540"
         Background="Transparent"
         WindowStyle="None"
         AllowsTransparency="True"
-        ResizeMode="CanResizeWithGrip"
+        ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner">
 
     <Border BorderBrush="#777777"
@@ -65,19 +64,43 @@
                              Margin="0,0,0,8">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Margin="0,2">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                    <TextBlock FontSize="11"
-                                               Foreground="{StaticResource ForegroundDimBrush}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}{0}@{1}:{2}">
-                                                <Binding Path="Username"/>
-                                                <Binding Path="Host"/>
-                                                <Binding Path="Port"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </StackPanel>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Connection icon -->
+                                    <Image Grid.Column="0"
+                                           Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
+                                           Width="22" Height="22"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
+                                    <TextBlock Grid.Column="0"
+                                               Text="&#xE8A1;"
+                                               FontFamily="Segoe MDL2 Assets"
+                                               FontSize="14"
+                                               Width="22"
+                                               TextAlignment="Center"
+                                               Foreground="{StaticResource ForegroundDimBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock FontSize="11"
+                                                   Foreground="{StaticResource ForegroundDimBrush}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0}@{1}:{2}">
+                                                    <Binding Path="Username"/>
+                                                    <Binding Path="Host"/>
+                                                    <Binding Path="Port"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -148,6 +171,8 @@
                                       x:Name="IconComboBox"
                                       ItemsSource="{Binding IconOptions}"
                                       SelectionChanged="IconComboBox_SelectionChanged"
+                                      Background="{StaticResource SurfaceBrush}"
+                                      Foreground="{StaticResource ForegroundBrush}"
                                       Margin="0,0,4,0">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
