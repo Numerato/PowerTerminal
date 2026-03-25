@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
-using System.Windows.Shell;
 using PowerTerminal.Models;
 using PowerTerminal.Services;
 using PowerTerminal.Views;
@@ -54,61 +53,43 @@ namespace PowerTerminal
             {
                 connections ??= new ConfigService().LoadConnections();
 
-                var jumpList = new JumpList();
-                jumpList.ShowFrequentCategory = false;
-                jumpList.ShowRecentCategory   = false;
+                string exePath = Process.GetCurrentProcess().MainModule!.FileName;
+                string exeDir  = Path.GetDirectoryName(exePath)!;
 
-                string exePath   = Process.GetCurrentProcess().MainModule!.FileName;
-                string exeDir    = Path.GetDirectoryName(exePath)!;
-                string defaultIcon = Path.Combine(exeDir, "Images", "powerterminal.ico");
+                // Use the .ico that ships next to the exe.  If it is missing (e.g. a
+                // stripped publish layout), pass null so individual items stay icon-less
+                // rather than having the entire category silently rejected by Windows.
+                string candidate   = Path.Combine(exeDir, "Images", "powerterminal.ico");
+                string? defaultIcon = File.Exists(candidate) ? candidate : null;
 
-                foreach (var conn in connections)
-                {
-                    jumpList.JumpItems.Add(new JumpTask
-                    {
-                        Title              = conn.Name,
-                        Description        = $"{conn.Username}@{conn.Host}:{conn.Port}",
-                        ApplicationPath    = exePath,
-                        // Explicitly set the working directory so Windows does not default
-                        // it to C:\Windows\system32 (which breaks all relative-path resolution).
-                        WorkingDirectory   = exeDir,
-                        Arguments          = $"--connect {conn.Id}",
-                        IconResourcePath   = ResolveJumpListIcon(conn.LogoPath, exeDir) ?? defaultIcon,
-                        IconResourceIndex  = 0,
-                        CustomCategory     = "Connections"
-                    });
-                }
-
-                JumpList.SetJumpList(Current, jumpList);
-                jumpList.Apply();
+                Exception? ex = NativeJumpList.Rebuild(connections, exePath, exeDir, defaultIcon);
+                if (ex is not null)
+                    LogJumpListError(ex);
             }
-            catch
+            catch (Exception ex)
             {
-                // Never let jump-list errors crash the application.
+                // Catch anything that escaped NativeJumpList (e.g. ConfigService failure).
+                LogJumpListError(ex);
             }
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Resolves a connection's LogoPath to an .ico file path suitable for a JumpTask icon.
-        /// Returns null when no suitable .ico is found (caller falls back to the app icon).
-        /// </summary>
-        private static string? ResolveJumpListIcon(string? logoPath, string baseDir)
+        private static void LogJumpListError(Exception ex)
         {
-            if (string.IsNullOrEmpty(logoPath)) return null;
-
-            string full = Path.IsPathRooted(logoPath)
-                ? logoPath
-                : Path.Combine(baseDir, logoPath);
-
-            // Already an .ico? Use it directly.
-            if (string.Equals(Path.GetExtension(full), ".ico", StringComparison.OrdinalIgnoreCase))
-                return File.Exists(full) ? full : null;
-
-            // Try swapping .png / .jpg → .ico (e.g. ico\linux.png → ico\linux.ico).
-            string icoPath = Path.ChangeExtension(full, ".ico");
-            return File.Exists(icoPath) ? icoPath : null;
+            try
+            {
+                // Append to the same startup.log that ConfigService uses so the
+                // error appears alongside the connection-count diagnostic.
+                string logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "PowerTerminal", "logs");
+                Directory.CreateDirectory(logDir);
+                string logPath = Path.Combine(logDir, "startup.log");
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] JumpList error: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}");
+            }
+            catch { /* logging must never crash the app */ }
         }
     }
 }
