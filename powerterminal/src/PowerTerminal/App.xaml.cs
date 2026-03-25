@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Shell;
 using PowerTerminal.Models;
@@ -13,18 +12,9 @@ namespace PowerTerminal
 {
     public partial class App : Application
     {
-        // Required for Windows to associate the jump list with the pinned shortcut.
-        private const string AppId = "com.powerterminal.app";
-
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-        private static extern void SetCurrentProcessExplicitAppUserModelID(string appId);
-
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-
-            // Set AUMID first — must be done before any Shell/taskbar calls.
-            SetCurrentProcessExplicitAppUserModelID(AppId);
 
             // Global exception handler
             DispatcherUnhandledException += (s, args) =>
