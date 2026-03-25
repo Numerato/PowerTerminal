@@ -171,7 +171,10 @@ namespace PowerTerminal
 
         private void ConnectBtn_Click(object sender, RoutedEventArgs e)
         {
-            ConnectPopup.IsOpen = true;
+            if (Vm.ConnectionManager.Connections.Count == 0)
+                OpenConnectionManager();
+            else
+                ConnectPopup.IsOpen = true;
         }
 
         private void ConnectItem_Click(object sender, RoutedEventArgs e)
