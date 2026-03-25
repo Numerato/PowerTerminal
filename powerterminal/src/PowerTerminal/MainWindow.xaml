@@ -7,8 +7,7 @@
         xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
         xmlns:views="clr-namespace:PowerTerminal.Views"
         mc:Ignorable="d"
-        Title="{Binding WindowTitle}"
-        Icon="{Binding WindowIcon}"
+        Title="PowerTerminal"
         Height="800" Width="1400"
         MinHeight="560" MinWidth="960"
         Background="Transparent"
@@ -151,8 +150,16 @@
                       Style="{StaticResource TitleBarButton}"
                       Click="ConnectBtn_Click"
                       WindowChrome.IsHitTestVisibleInChrome="True"
-                      Padding="8,6"
-                      ToolTip="{Binding ConnectionManager.Connections.Count, StringFormat='Open a connection ({0} configured)'}">
+                      Padding="8,6">
+                <Button.ToolTip>
+                  <ToolTip>
+                    <TextBlock>
+                      <Run Text="Open a connection (" />
+                      <Run Text="{Binding ConnectionManager.Connections.Count, Mode=OneWay}" />
+                      <Run Text=" configured)" />
+                    </TextBlock>
+                  </ToolTip>
+                </Button.ToolTip>
                 <!-- White "+" new-tab icon -->
                 <TextBlock Text="+"
                            FontSize="18"
@@ -450,7 +457,7 @@
                                              RelativeSource={RelativeSource AncestorType=Window},
                                              Converter={StaticResource BoolToVisConverter}}"/>
               <!-- Explorer panel -->
-              <views:ExplorerView
+              <views:ExplorerView DataContext="{Binding Explorer}"
                           Visibility="{Binding DataContext.ExplorerPanelActive,
                                        RelativeSource={RelativeSource AncestorType=Window},
                                        Converter={StaticResource BoolToVisConverter}}"/>

@@ -359,9 +359,9 @@ namespace PowerTerminal.Services
         }
 
         /// <summary>
-        /// Ensures a real 'poweredit' executable exists in the user's bin directory
+        /// Ensures a real 'pwe' executable exists in the user's bin directory
         /// (~/bin or ~/.local/bin).  Because bash scans PATH for completion candidates,
-        /// this makes 'po'+Tab list 'poweredit'.
+        /// this makes 'p'+Tab list 'pwe'.
         ///
         /// If the bin dir didn't exist before this session (Ubuntu's .profile only adds
         /// ~/bin to PATH when the dir exists at login time), we also inject
@@ -399,8 +399,8 @@ namespace PowerTerminal.Services
                 RunCommand($"mkdir -p \"{binDir}\"");
                 RunCommand(
                     $"printf '#!/usr/bin/env bash\\nexit 0\\n'" +
-                    $" > \"{binDir}/poweredit\"");
-                RunCommand($"chmod +x \"{binDir}/poweredit\"");
+                    $" > \"{binDir}/pwe\"");
+                RunCommand($"chmod +x \"{binDir}/pwe\"");
             });
 
             // If ~/bin was just created it is not yet in the interactive session's PATH.

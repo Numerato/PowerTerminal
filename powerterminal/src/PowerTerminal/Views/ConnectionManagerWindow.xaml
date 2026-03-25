@@ -58,26 +58,45 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <ListBox Grid.Row="0"
+                             x:Name="ConnectionListBox"
                              ItemsSource="{Binding Connections}"
                              SelectedItem="{Binding Selected, Mode=TwoWay}"
                              Background="{StaticResource SurfaceBrush}"
+                             AllowDrop="True"
+                             PreviewMouseMove="ConnectionList_PreviewMouseMove"
+                             Drop="ConnectionList_Drop"
                              Margin="0,0,0,8">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                <Setter Property="AllowDrop" Value="True"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="0,2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
+                                    <!-- Drag handle -->
+                                    <TextBlock Grid.Column="0"
+                                               Text="&#x2807;"
+                                               FontSize="14"
+                                               Foreground="{StaticResource ForegroundDimBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0"
+                                               Cursor="SizeAll"
+                                               ToolTip="Drag to reorder"/>
                                     <!-- Connection icon -->
-                                    <Image Grid.Column="0"
+                                    <Image Grid.Column="1"
                                            Source="{Binding LogoPath, Converter={StaticResource StringToImageConverter}}"
                                            Width="22" Height="22"
                                            Margin="0,0,8,0"
                                            VerticalAlignment="Center"
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisConverter}}"/>
-                                    <TextBlock Grid.Column="0"
+                                    <TextBlock Grid.Column="1"
                                                Text="&#xE8A1;"
                                                FontFamily="Segoe MDL2 Assets"
                                                FontSize="14"
@@ -87,7 +106,7 @@
                                                VerticalAlignment="Center"
                                                Margin="0,0,8,0"
                                                Visibility="{Binding LogoPath, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"/>
-                                    <StackPanel Grid.Column="1">
+                                    <StackPanel Grid.Column="2">
                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
                                         <TextBlock FontSize="11"
                                                    Foreground="{StaticResource ForegroundDimBrush}">
@@ -106,7 +125,7 @@
                     </ListBox>
                     <StackPanel Grid.Row="1" Orientation="Horizontal">
                         <Button Content="+ Add"  Style="{StaticResource FlatButton}" Command="{Binding AddCommand}"    Margin="0,0,4,0" MinWidth="55"/>
-                        <Button Content="Delete" Style="{StaticResource FlatButton}" Command="{Binding DeleteCommand}" Margin="0,0,4,0" MinWidth="55"/>
+                        <Button Content="Delete" Style="{StaticResource FlatButton}" IsEnabled="{Binding Selected, Converter={StaticResource NullToBoolConverter}}" Click="Delete_Click" Margin="0,0,4,0" MinWidth="55"/>
                         <Button Content="Copy"   Style="{StaticResource FlatButton}" Command="{Binding CopyCommand}"   MinWidth="55"/>
                     </StackPanel>
                 </Grid>
@@ -142,19 +161,27 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Label Grid.Row="0" Grid.Column="0" Content="Name:"/>
+                        <Label Grid.Row="0" Grid.Column="0">
+                            <TextBlock><Run Text="Name"/><Run Text=" *" Foreground="OrangeRed" FontWeight="Bold"/><Run Text=":"/></TextBlock>
+                        </Label>
                         <TextBox Grid.Row="0" Grid.Column="1" x:Name="NameTextBox" Margin="0,0,0,6"
                                  Text="{Binding Editing.Name, UpdateSourceTrigger=PropertyChanged}"/>
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Host / IP:"/>
+                        <Label Grid.Row="1" Grid.Column="0">
+                            <TextBlock><Run Text="Host / IP"/><Run Text=" *" Foreground="OrangeRed" FontWeight="Bold"/><Run Text=":"/></TextBlock>
+                        </Label>
                         <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,6"
                                  Text="{Binding Editing.Host, UpdateSourceTrigger=PropertyChanged}"/>
 
-                        <Label Grid.Row="2" Grid.Column="0" Content="Username:"/>
+                        <Label Grid.Row="2" Grid.Column="0">
+                            <TextBlock><Run Text="Username"/><Run Text=" *" Foreground="OrangeRed" FontWeight="Bold"/><Run Text=":"/></TextBlock>
+                        </Label>
                         <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,6"
                                  Text="{Binding Editing.Username, UpdateSourceTrigger=PropertyChanged}"/>
 
-                        <Label Grid.Row="3" Grid.Column="0" Content="Port:"/>
+                        <Label Grid.Row="3" Grid.Column="0">
+                            <TextBlock><Run Text="Port"/><Run Text=" *" Foreground="OrangeRed" FontWeight="Bold"/><Run Text=":"/></TextBlock>
+                        </Label>
                         <TextBox Grid.Row="3" Grid.Column="1" Margin="0,0,0,6"
                                  Text="{Binding Editing.Port, UpdateSourceTrigger=PropertyChanged}"/>
 

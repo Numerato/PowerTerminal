@@ -19,6 +19,7 @@ namespace PowerTerminal.ViewModels
         private bool _isConnecting;
         private string _statusText = "Disconnected";
         private MachineInfo? _machineInfo;
+        private RemoteExplorerViewModel? _explorer;
 
         /// <summary>
         /// When true the tab view will call <see cref="ConnectAsync"/> as soon as it loads.
@@ -26,8 +27,30 @@ namespace PowerTerminal.ViewModels
         /// </summary>
         public bool AutoConnectOnLoad { get; set; }
 
-        /// <summary>When true the terminal intercepts "poweredit &lt;file&gt;" commands instead of forwarding them to the shell.</summary>
+        /// <summary>When true the terminal intercepts "pwe &lt;file&gt;" commands instead of forwarding them to the shell.</summary>
         public bool EnablePowerEdit { get; set; }
+
+        /// <summary>Raised by the Explorer panel to open a remote file in PowerEdit.</summary>
+        public event Action<string, bool>? ExplorerOpenFileRequested;
+
+        /// <summary>Called by the Explorer ViewModel to open a file in the editor.</summary>
+        public void RequestOpenFileViaExplorer(string path, bool useSudo)
+            => ExplorerOpenFileRequested?.Invoke(path, useSudo);
+
+        /// <summary>Per-tab file explorer ViewModel — lazily created on first access.</summary>
+        public RemoteExplorerViewModel Explorer
+        {
+            get
+            {
+                if (_explorer == null)
+                {
+                    _explorer = new RemoteExplorerViewModel();
+                    _explorer.SetActiveTab(this);
+                    _explorer.OpenFileRequested += (path, useSudo) => RequestOpenFileViaExplorer(path, useSudo);
+                }
+                return _explorer;
+            }
+        }
 
         /// <summary>Determines how copy and paste work in the terminal panel.</summary>
         public Models.TerminalCopyPasteMode CopyPasteMode { get; set; } = Models.TerminalCopyPasteMode.RightClickMenu;
@@ -155,6 +178,7 @@ namespace PowerTerminal.ViewModels
             // Notify the View so it can attach the session to the terminal control
             // BEFORE ConnectAsync starts reading data (avoids missing the login banner).
             SessionAttachRequired?.Invoke(this, _ssh);
+            LocalOutput?.Invoke($"Connecting to {Connection.Host}:{Connection.Port}...\r\n");
 
             _ssh.Disconnected += (_, _) =>
             {

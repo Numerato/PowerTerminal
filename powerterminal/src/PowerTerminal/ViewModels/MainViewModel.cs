@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using PowerTerminal.Models;
 using PowerTerminal.Services;
 
@@ -61,6 +60,7 @@ namespace PowerTerminal.ViewModels
         public WikiViewModel            Wiki              { get; }
         public ConnectionManagerViewModel ConnectionManager { get; }
         public WikiEditorViewModel      WikiEditor        { get; }
+        public RemoteExplorerViewModel? Explorer => _activeTerminalTab?.Explorer;
 
         public ICommand AddTabCommand                 { get; }
         public ICommand OpenConnectionManagerCommand  { get; }
@@ -89,36 +89,8 @@ namespace PowerTerminal.ViewModels
                     foreach (var tab in TerminalTabs)
                         tab.IsActive = (tab == value);
                     Wiki.ActiveTerminal = value;
-                    OnPropertyChanged(nameof(WindowTitle));
-                    OnPropertyChanged(nameof(WindowIcon));
+                    OnPropertyChanged(nameof(Explorer));
                 }
-            }
-        }
-
-        /// <summary>Window title shown in the taskbar: active tab name or default app name.</summary>
-        public string WindowTitle => _activeTerminalTab?.Header ?? "PowerTerminal";
-
-        /// <summary>Taskbar icon: tab logo when set, otherwise the default app icon.</summary>
-        public ImageSource? WindowIcon
-        {
-            get
-            {
-                var logoPath = _activeTerminalTab?.LogoPath;
-                if (!string.IsNullOrEmpty(logoPath))
-                {
-                    try
-                    {
-                        // Always resolve to an absolute path so BitmapImage is never
-                        // resolved against Environment.CurrentDirectory (which is
-                        // C:\Windows\system32 when launched via a taskbar jump list).
-                        string fullPath = System.IO.Path.IsPathRooted(logoPath)
-                            ? logoPath
-                            : System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, logoPath);
-                        return new BitmapImage(new Uri(fullPath, UriKind.Absolute));
-                    }
-                    catch { /* fall through to default */ }
-                }
-                return null; // null → WPF uses the Window's own Icon from XAML
             }
         }
 

@@ -37,9 +37,18 @@ namespace PowerTerminal.ViewModels
             }
             else
             {
-                // No connections yet — open the Add form immediately.
                 StartAdd();
             }
+        }
+
+        /// <summary>
+        /// Called every time the Connection Manager window is shown.
+        /// Resets state for re-opened windows: auto-starts Add if the list is empty.
+        /// </summary>
+        public void OnWindowShown()
+        {
+            if (Connections.Count == 0 && Editing == null)
+                StartAdd();
         }
 
         public ObservableCollection<SshConnection> Connections { get; }
@@ -70,10 +79,11 @@ namespace PowerTerminal.ViewModels
 
         public bool IsEditing => Editing != null;
 
-        /// <summary>Raised after Copy to tell the view to focus the Name field.</summary>
+        /// <summary>Raised after Copy or Add to tell the view to focus the Name field.</summary>
         public event Action FocusNameFieldRequested;
 
         private bool _isAddMode;
+        public bool IsAddMode => _isAddMode;
 
         private void StartAdd()
         {
@@ -82,8 +92,9 @@ namespace PowerTerminal.ViewModels
             {
                 Name     = "New Connection",
                 Port     = 22,
-                LogoPath = GetDefaultIconPath("linux.png")
+                LogoPath = GetDefaultIconPath("linux.ico")
             };
+            FocusNameFieldRequested?.Invoke();
         }
 
         private void CopySelected()
@@ -140,7 +151,8 @@ namespace PowerTerminal.ViewModels
                 }
             }
             _config.SaveConnections(Connections);
-            Editing = null;
+            // Reload the form from the saved connection so fields stay populated.
+            StartEdit();
         }
 
         private void CancelEdit()
@@ -157,9 +169,48 @@ namespace PowerTerminal.ViewModels
             Editing  = null;
             Selected = null;
             _suppressAutoEdit = false;
+
+            if (Connections.Count > 0)
+            {
+                Selected = Connections[0];
+                StartEdit();
+            }
+            else
+            {
+                StartAdd();
+            }
         }
 
         // ── Icon helpers ────────────────────────────────────────────────────
+
+        // ── Reorder ─────────────────────────────────────────────────────────
+
+        public void MoveConnection(SshConnection item, SshConnection target)
+        {
+            int from = Connections.IndexOf(item);
+            int to   = Connections.IndexOf(target);
+            if (from < 0 || to < 0 || from == to) return;
+            Connections.Move(from, to);
+            _config.SaveConnections(Connections);
+        }
+
+        public void MoveSelectedUp()
+        {
+            if (Selected == null) return;
+            int idx = Connections.IndexOf(Selected);
+            if (idx <= 0) return;
+            Connections.Move(idx, idx - 1);
+            _config.SaveConnections(Connections);
+        }
+
+        public void MoveSelectedDown()
+        {
+            if (Selected == null) return;
+            int idx = Connections.IndexOf(Selected);
+            if (idx < 0 || idx >= Connections.Count - 1) return;
+            Connections.Move(idx, idx + 1);
+            _config.SaveConnections(Connections);
+        }
 
         private bool _suppressAutoEdit;
 

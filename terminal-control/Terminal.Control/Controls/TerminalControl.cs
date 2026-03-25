@@ -117,9 +117,9 @@ public sealed class TerminalControl : FrameworkElement
 
     // PowerEdit: tracks what the user is typing on the current shell line
     private readonly StringBuilder _commandBuffer = new();
-    /// <summary>When true, "poweredit &lt;file&gt;" commands are intercepted before they reach the shell.</summary>
+    /// <summary>When true, "pwe &lt;file&gt;" commands are intercepted before they reach the shell.</summary>
     public bool EnablePowerEdit { get; set; }
-    /// <summary>Fired when a "poweredit &lt;file&gt;" command is intercepted. Arg is the full command string.</summary>
+    /// <summary>Fired when a "pwe &lt;file&gt;" command is intercepted. Arg is the full command string.</summary>
     public event EventHandler<string>? PowerEditCommand;
 
     /// <summary>Controls copy/paste interaction model in the terminal.</summary>
@@ -586,10 +586,10 @@ public sealed class TerminalControl : FrameworkElement
                 // tab-completed text that was echoed back by the shell and never
                 // passed through OnTextInput.
                 string cmd = GetCurrentLineCommand();
-                if (cmd.Equals("poweredit", StringComparison.OrdinalIgnoreCase) ||
-                    cmd.StartsWith("poweredit ", StringComparison.OrdinalIgnoreCase))
+                if (cmd.Equals("pwe", StringComparison.OrdinalIgnoreCase) ||
+                    cmd.StartsWith("pwe ", StringComparison.OrdinalIgnoreCase))
                 {
-                    _session.Send("\r"); // let bash echo + run the silent ~/bin/poweredit script
+                    _session.Send("\r"); // let bash echo + run the silent ~/bin/pwe script
                     PowerEditCommand?.Invoke(this, cmd);
                     e.Handled = true;
                     return;
@@ -666,8 +666,8 @@ public sealed class TerminalControl : FrameworkElement
 
         string line = sb.ToString().TrimEnd();
 
-        // Extract from "poweredit" onwards, ignoring the shell prompt prefix
-        int idx = line.IndexOf("poweredit", StringComparison.OrdinalIgnoreCase);
+        // Extract from "pwe" onwards, ignoring the shell prompt prefix
+        int idx = line.IndexOf("pwe", StringComparison.OrdinalIgnoreCase);
         return idx >= 0 ? line[idx..] : string.Empty;
     }
 
@@ -689,7 +689,7 @@ public sealed class TerminalControl : FrameworkElement
         string line = sb.ToString().TrimEnd();
 
         // Find where the command starts so we only look at the prompt portion
-        int cmdIdx = line.IndexOf("poweredit", StringComparison.OrdinalIgnoreCase);
+        int cmdIdx = line.IndexOf("pwe", StringComparison.OrdinalIgnoreCase);
         string prompt = cmdIdx > 0 ? line[..cmdIdx] : line;
 
         // Common bash prompt pattern: ends with ":PATH$ " or ":PATH# "

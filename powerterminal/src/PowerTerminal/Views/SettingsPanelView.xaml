@@ -183,7 +183,7 @@
                            Margin="0,0,0,8"/>
 
                 <CheckBox x:Name="EnablePowerEditCheck"
-                          Content="Enable PowerEdit"
+                          Content="Enable PowerEdit (pwe command) ★ Recommended!"
                           Foreground="{StaticResource ForegroundBrush}"
                           Margin="0,0,0,16"/>
 

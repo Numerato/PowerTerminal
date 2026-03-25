@@ -41,6 +41,8 @@ namespace PowerTerminal
             pid   = 2
         };
 
+        private const string Aumid = "PowerTerminal.App";
+
         // ── Public entry point ────────────────────────────────────────────────
 
         /// <summary>
@@ -59,6 +61,8 @@ namespace PowerTerminal
             {
                 destList = (ICustomDestinationList)Activator.CreateInstance(
                     Type.GetTypeFromCLSID(CLSID_DestinationList, throwOnError: true)!)!;
+
+                destList.SetAppID(Aumid);
 
                 var iid = IID_IObjectArray;
                 destList.BeginList(out _, ref iid, out _);

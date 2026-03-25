@@ -224,4 +224,21 @@ namespace PowerTerminal.Converters
         public object ConvertBack(object v, Type t, object p, CultureInfo c)
             => throw new NotImplementedException();
     }
+
+    /// <summary>
+    /// MultiBinding converter: [IsDirectory (bool), Name (string)] → BitmapSource shell icon.
+    /// </summary>
+    public class FileIconConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values.Length < 2) return null;
+            bool isDir = values[0] is bool b && b;
+            string name = values[1] as string ?? string.Empty;
+            return Services.FileIconService.GetIcon(name, isDir);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
 }

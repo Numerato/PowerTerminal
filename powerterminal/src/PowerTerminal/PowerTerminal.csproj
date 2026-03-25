@@ -10,6 +10,7 @@
     <AssemblyName>PowerTerminal</AssemblyName>
     <RootNamespace>PowerTerminal</RootNamespace>
     <ApplicationIcon>Images\powerterminal.ico</ApplicationIcon>
+    <StartupObject>PowerTerminal.Program</StartupObject>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">

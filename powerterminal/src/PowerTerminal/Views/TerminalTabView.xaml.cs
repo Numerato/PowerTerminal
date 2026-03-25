@@ -24,6 +24,7 @@ namespace PowerTerminal.Views
         private EventHandler? _requestConnectHandler;
         private Action<string>? _localOutputHandler;
         private EventHandler<string>? _powerEditHandler;
+        private Action<string, bool>? _explorerOpenHandler;
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
@@ -37,6 +38,8 @@ namespace PowerTerminal.Views
                 _localOutputHandler    = null;
                 if (_powerEditHandler  != null) Terminal.PowerEditCommand -= _powerEditHandler;
                 _powerEditHandler      = null;
+                if (_explorerOpenHandler != null) _vm.ExplorerOpenFileRequested -= _explorerOpenHandler;
+                _explorerOpenHandler   = null;
             }
 
             _vm = DataContext as TerminalTabViewModel;
@@ -62,6 +65,9 @@ namespace PowerTerminal.Views
             {
                 _powerEditHandler = (_, cmd) => OnPowerEditCommand(cmd);
                 Terminal.PowerEditCommand += _powerEditHandler;
+
+                _explorerOpenHandler = (path, useSudo) => _ = OpenFileFromExplorerAsync(path, useSudo);
+                _vm.ExplorerOpenFileRequested += _explorerOpenHandler;
             }
 
             if (IsLoaded && _vm.AutoConnectOnLoad)
@@ -79,20 +85,20 @@ namespace PowerTerminal.Views
             }
             catch (Exception ex)
             {
-                Terminal.WriteStatusMessage($"\r\npoweredit: error: {ex.Message}\r\n");
+                Terminal.WriteStatusMessage($"\r\npwe: error: {ex.Message}\r\n");
                 _vm?.SendData("\r");
             }
         }
 
         private async System.Threading.Tasks.Task OnPowerEditCommandAsync(string cmd)
         {
-            string filename = cmd.Length > "poweredit ".Length
-                ? cmd["poweredit ".Length..].Trim()
+            string filename = cmd.Length > "pwe ".Length
+                ? cmd["pwe ".Length..].Trim()
                 : string.Empty;
 
             if (string.IsNullOrWhiteSpace(filename))
             {
-                Terminal.WriteStatusMessage("\r\npoweredit: Usage: poweredit <filename>\r\n");
+                Terminal.WriteStatusMessage("\r\npwe: Usage: pwe <filename>\r\n");
                 _vm?.SendData("\r");
                 return;
             }
@@ -199,7 +205,7 @@ namespace PowerTerminal.Views
 
                 if (!success)
                 {
-                    Terminal.WriteStatusMessage($"poweredit: Cannot read file: {resolvedPath}\r\n");
+                    Terminal.WriteStatusMessage($"pwe: Cannot read file: {resolvedPath}\r\n");
                     _vm?.SendData("\r");
                     return;
                 }
@@ -319,6 +325,143 @@ namespace PowerTerminal.Views
 
         private static string EscapePath(string path)
             => path.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        /// <summary>Opens a remote file in the editor - called from the Explorer panel (no terminal prompts).</summary>
+        public async System.Threading.Tasks.Task OpenFileFromExplorerAsync(string path, bool useSudo)
+        {
+            if (_vm == null) return;
+            string sudoPassword = string.Empty;
+
+            string existsStr = await _vm.RunCommandAsync($"[ -e \"{EscapePath(path)}\" ] && echo yes || echo no");
+            bool exists = existsStr.Trim() == "yes";
+
+            bool isReadOnly = false;
+            string content = string.Empty;
+
+            if (!exists)
+            {
+                string parentDir = (await _vm.RunCommandAsync($"dirname \"{EscapePath(path)}\"")).Trim();
+                string writable  = await _vm.RunCommandAsync($"[ -w \"{EscapePath(parentDir)}\" ] && echo yes || echo no");
+                if (writable.Trim() != "yes")
+                {
+                    if (!useSudo)
+                    {
+                        DarkMessageBox.Show(
+                            Window.GetWindow(this),
+                            $"No write permission to directory.\nEnable Sudo in the Explorer toolbar to create this file.",
+                            "Permission Denied",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
+                    sudoPassword = ShowPasswordDialog();
+                    if (string.IsNullOrEmpty(sudoPassword)) return;
+                }
+            }
+            else
+            {
+                string canRead  = await _vm.RunCommandAsync($"[ -r \"{EscapePath(path)}\" ] && echo yes || echo no");
+                string canWrite = await _vm.RunCommandAsync($"[ -w \"{EscapePath(path)}\" ] && echo yes || echo no");
+
+                if (canRead.Trim() != "yes")
+                {
+                    if (!useSudo)
+                    {
+                        DarkMessageBox.Show(
+                            Window.GetWindow(this),
+                            $"No read permission for:\n{path}\n\nEnable Sudo in the Explorer toolbar.",
+                            "Permission Denied",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
+                    sudoPassword = ShowPasswordDialog();
+                    if (string.IsNullOrEmpty(sudoPassword)) return;
+                }
+                else if (canWrite.Trim() != "yes")
+                {
+                    // File is readable but not writable — ask user what to do
+                    string choice = string.Empty;
+                    Dispatcher.Invoke(() =>
+                    {
+                        var dlg = new DarkChoiceWindow(
+                            "Read-only File",
+                            $"You do not have write permission for:\n{path}\n\nHow do you want to open it?",
+                            new[] { "Read Only", "Edit with Sudo", "Cancel" })
+                        {
+                            Owner = Window.GetWindow(this)
+                        };
+                        dlg.ShowDialog();
+                        choice = dlg.SelectedChoice ?? "Cancel";
+                    });
+
+                    if (choice == "Cancel" || string.IsNullOrEmpty(choice)) return;
+                    if (choice == "Read Only")
+                    {
+                        isReadOnly = true;
+                    }
+                    else // "Edit with Sudo"
+                    {
+                        sudoPassword = ShowPasswordDialog();
+                        if (string.IsNullOrEmpty(sudoPassword)) return;
+                        useSudo = true;
+                    }
+                }
+
+                var (readContent, success) = await _vm.ReadFileAsync(path, sudoPassword);
+                if (!success)
+                {
+                    DarkMessageBox.Show(
+                        Window.GetWindow(this),
+                        $"Cannot read file:\n{path}",
+                        "Read Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+                content = readContent;
+            }
+
+            content = content.Replace("\r\n", "\n").Replace("\r", "\n");
+
+            var editorVm = new PowerEditViewModel
+            {
+                FilePath     = path,
+                IsReadOnly   = isReadOnly,
+                UseSudo      = !string.IsNullOrEmpty(sudoPassword),
+                SudoPassword = sudoPassword,
+                FontFamily   = _vm?.Theme?.FontFamily ?? "Consolas",
+                FontSize     = _vm?.Theme?.FontSize   ?? 13,
+                ReadFile     = (p, pass) => _vm!.ReadFileAsync(p, pass),
+                WriteFile    = (p, c, pass) => _vm!.WriteFileAsync(p, c, pass)
+            };
+            editorVm.CloseRequested += (_, _) => _ = ConfirmAndCloseEditorAsync(editorVm);
+
+            Dispatcher.Invoke(() =>
+            {
+                PowerEditor.DataContext = editorVm;
+                PowerEditor.Visibility  = Visibility.Visible;
+                Terminal.Visibility     = Visibility.Collapsed;
+                TerminalScrollBar.Visibility = Visibility.Collapsed;
+                editorVm.LoadContent(content);
+                PowerEditor.FocusEditor();
+            });
+        }
+
+        private string ShowPasswordDialog()
+        {
+            string result = string.Empty;
+            Dispatcher.Invoke(() =>
+            {
+                var dlg = new DarkPasswordWindow("Sudo Authentication", $"Enter sudo password for {_vm?.Username ?? "user"}:")
+                {
+                    Owner = Window.GetWindow(this)
+                };
+                if (dlg.ShowDialog() == true)
+                    result = dlg.Password;
+            });
+            return result;
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
