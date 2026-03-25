@@ -231,12 +231,12 @@
                         <TextBlock Text="&#xE8C7;"
                                    FontFamily="Segoe MDL2 Assets"
                                    FontSize="13"
-                                   Foreground="{StaticResource ForegroundDimBrush}"
+                                   Foreground="{StaticResource ForegroundBrush}"
                                    VerticalAlignment="Center"
                                    Width="32"
                                    TextAlignment="Center"/>
                         <TextBlock Text="Manage Connections…"
-                                   Foreground="{StaticResource ForegroundDimBrush}"
+                                   Foreground="{StaticResource ForegroundBrush}"
                                    VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
