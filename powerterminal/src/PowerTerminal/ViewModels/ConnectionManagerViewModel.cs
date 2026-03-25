@@ -21,6 +21,7 @@ namespace PowerTerminal.ViewModels
 
             AddCommand    = new RelayCommand(_ => StartAdd());
             DeleteCommand = new RelayCommand(_ => Delete(), _ => Selected != null);
+            CopyCommand   = new RelayCommand(_ => CopySelected(), _ => Selected != null);
             SaveCommand   = new RelayCommand(_ => SaveEdit(), _ => Editing != null);
             CancelCommand = new RelayCommand(_ => CancelEdit(), _ => Editing != null);
 
@@ -34,11 +35,17 @@ namespace PowerTerminal.ViewModels
                 _suppressAutoEdit = false;
                 StartEdit();
             }
+            else
+            {
+                // No connections yet — open the Add form immediately.
+                StartAdd();
+            }
         }
 
         public ObservableCollection<SshConnection> Connections { get; }
         public ICommand AddCommand    { get; }
         public ICommand DeleteCommand { get; }
+        public ICommand CopyCommand   { get; }
         public ICommand SaveCommand   { get; }
         public ICommand CancelCommand { get; }
 
@@ -63,6 +70,9 @@ namespace PowerTerminal.ViewModels
 
         public bool IsEditing => Editing != null;
 
+        /// <summary>Raised after Copy to tell the view to focus the Name field.</summary>
+        public event Action FocusNameFieldRequested;
+
         private bool _isAddMode;
 
         private void StartAdd()
@@ -74,6 +84,21 @@ namespace PowerTerminal.ViewModels
                 Port     = 22,
                 LogoPath = GetDefaultIconPath("linux.png")
             };
+        }
+
+        private void CopySelected()
+        {
+            if (Selected == null) return;
+            _isAddMode = true;
+            Editing = new SshConnection
+            {
+                Name     = $"Copy of {Selected.Name}",
+                Host     = Selected.Host,
+                Username = Selected.Username,
+                Port     = Selected.Port,
+                LogoPath = Selected.LogoPath
+            };
+            FocusNameFieldRequested?.Invoke();
         }
 
         private void StartEdit()

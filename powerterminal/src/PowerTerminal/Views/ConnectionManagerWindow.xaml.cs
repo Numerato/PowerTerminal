@@ -22,6 +22,13 @@ namespace PowerTerminal.Views
                 if (e.PropertyName == nameof(ConnectionManagerViewModel.Editing))
                     SyncIconComboBox();
             };
+            // Focus the Name field after Copy
+            vm.FocusNameFieldRequested += () =>
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+                {
+                    NameTextBox.Focus();
+                    NameTextBox.SelectAll();
+                }));
         }
 
         private ConnectionManagerViewModel Vm => (ConnectionManagerViewModel)DataContext;

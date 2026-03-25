@@ -441,8 +441,20 @@
                                       IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay,
                                                           RelativeSource={RelativeSource TemplatedParent}}"
                                       ClickMode="Press"
-                                      Background="Transparent"
-                                      BorderThickness="0"/>
+                                      BorderThickness="0">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ToggleButton.Style>
+                        </ToggleButton>
                         <!-- Dropdown popup -->
                         <Popup x:Name="Popup"
                                Placement="Bottom"

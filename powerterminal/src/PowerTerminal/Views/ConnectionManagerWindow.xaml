@@ -106,7 +106,8 @@
                     </ListBox>
                     <StackPanel Grid.Row="1" Orientation="Horizontal">
                         <Button Content="+ Add"  Style="{StaticResource FlatButton}" Command="{Binding AddCommand}"    Margin="0,0,4,0" MinWidth="55"/>
-                        <Button Content="Delete" Style="{StaticResource FlatButton}" Command="{Binding DeleteCommand}" MinWidth="55"/>
+                        <Button Content="Delete" Style="{StaticResource FlatButton}" Command="{Binding DeleteCommand}" Margin="0,0,4,0" MinWidth="55"/>
+                        <Button Content="Copy"   Style="{StaticResource FlatButton}" Command="{Binding CopyCommand}"   MinWidth="55"/>
                     </StackPanel>
                 </Grid>
 
@@ -142,7 +143,7 @@
                         </Grid.ColumnDefinitions>
 
                         <Label Grid.Row="0" Grid.Column="0" Content="Name:"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,6"
+                        <TextBox Grid.Row="0" Grid.Column="1" x:Name="NameTextBox" Margin="0,0,0,6"
                                  Text="{Binding Editing.Name, UpdateSourceTrigger=PropertyChanged}"/>
 
                         <Label Grid.Row="1" Grid.Column="0" Content="Host / IP:"/>
