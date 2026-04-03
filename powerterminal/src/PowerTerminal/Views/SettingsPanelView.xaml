@@ -187,6 +187,28 @@
                           Foreground="{StaticResource ForegroundBrush}"
                           Margin="0,0,0,16"/>
 
+                <Separator Margin="0,12,0,12"/>
+
+                <!-- Command Palette -->
+                <TextBlock Text="Command Palette"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource AccentBrush}"
+                           Margin="0,0,0,8"/>
+
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Label Content="Open shortcut:"/>
+                    <TextBox Grid.Column="1" x:Name="CommandPaletteShortcutInput"/>
+                </Grid>
+
+                <TextBlock Text="Ctrl+Ctrl = double-press Ctrl within 400 ms. Other examples: F12, Ctrl+Space, Ctrl+F12."
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="11" TextWrapping="Wrap"
+                           Margin="130,0,0,8"/>
+
             </StackPanel>
         </ScrollViewer>
 

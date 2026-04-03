@@ -16,6 +16,7 @@ namespace PowerTerminal.Views
     public partial class CommandPaletteWindow : Window
     {
         private bool _closing;
+        private bool _childDialogOpen;
 
         private static readonly SolidColorBrush AccentBrush     = new(Color.FromRgb(0xE8, 0x77, 0x22));
         private static readonly SolidColorBrush PromptVarBrush  = new(Color.FromRgb(0xE8, 0xA4, 0x5A));
@@ -62,7 +63,8 @@ namespace PowerTerminal.Views
 
         private void Window_Deactivated(object sender, EventArgs e)
         {
-            if (!_closing) { _closing = true; Close(); }
+            // Don't auto-close if a child dialog (e.g. VariablePromptWindow) stole focus.
+            if (!_closing && !_childDialogOpen) { _closing = true; Close(); }
         }
 
         // ── Keyboard (window-level, intercepts before any child) ─────────────
@@ -80,7 +82,7 @@ namespace PowerTerminal.Views
                     e.Handled = true;
                     break;
                 case Key.Enter:
-                    SendSelected(withEnter: true);
+                    SendSelected(withEnter: false);
                     e.Handled = true;
                     break;
                 case Key.Tab:
@@ -166,15 +168,25 @@ namespace PowerTerminal.Views
 
         // ── Command line rich rendering (variable segments) ───────────────────
 
+        private static readonly SolidColorBrush TitleDefaultBrush = new(Color.FromRgb(0xE0, 0xE0, 0xE0));
+
         private void RenderCommandLines()
         {
             if (ViewModel == null) return;
 
-            // Walk the visual tree and fill in CmdLine TextBlocks for each visible item
+            var selected = ViewModel.SelectedCommand;
+
+            // Walk the visual tree and fill in CmdLine TextBlocks + title colours for each visible item
             foreach (LinuxCommand cmd in ViewModel.FilteredCommands)
             {
                 var container = ResultsList.ItemContainerGenerator.ContainerFromItem(cmd) as ListBoxItem;
                 if (container == null) continue;
+
+                // Title colour: orange when selected, normal otherwise
+                var titleText = FindVisualChild<TextBlock>(container, "TitleText");
+                if (titleText != null)
+                    titleText.Foreground = ReferenceEquals(cmd, selected) ? AccentBrush : TitleDefaultBrush;
+
                 var cmdLine = FindVisualChild<TextBlock>(container, "CmdLine");
                 if (cmdLine == null) continue;
                 RenderSegments(cmdLine, ViewModel.GetCommandSegments(cmd), isDetail: false);
@@ -273,8 +285,12 @@ namespace PowerTerminal.Views
 
             foreach (var varName in promptVars)
             {
+                _childDialogOpen = true;
                 var dlg = new VariablePromptWindow(varName) { Owner = this };
-                if (dlg.ShowDialog() != true) return; // user cancelled — abort send
+                bool? result = dlg.ShowDialog();
+                _childDialogOpen = false;
+
+                if (result != true) return; // user cancelled — abort send
 
                 string value = dlg.Value;
                 resolved = Regex.Replace(

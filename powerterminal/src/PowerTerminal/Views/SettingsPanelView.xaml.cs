@@ -33,6 +33,7 @@ namespace PowerTerminal.Views
             FontFamilyInput.Text         = s.Theme.FontFamily;
             FontSizeInput.Text           = s.Theme.FontSize.ToString(CultureInfo.InvariantCulture);
             SshKeysFolderInput.Text      = s.SshKeysFolder;
+            CommandPaletteShortcutInput.Text = s.CommandPaletteShortcut;
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
@@ -53,7 +54,12 @@ namespace PowerTerminal.Views
                     CultureInfo.InvariantCulture, out double fs))
                 s.Theme.FontSize = fs;
             s.SshKeysFolder       = SshKeysFolderInput.Text.Trim();
+            if (!string.IsNullOrWhiteSpace(CommandPaletteShortcutInput.Text))
+                s.CommandPaletteShortcut = CommandPaletteShortcutInput.Text.Trim();
             _config.SaveSettings(s);
+
+            // Let MainWindow pick up the new shortcut immediately.
+            (Window.GetWindow(this) as MainWindow)?.ReloadPaletteShortcut();
 
             DarkMessageBox.Show(
                 Window.GetWindow(this),

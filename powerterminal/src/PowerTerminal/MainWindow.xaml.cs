@@ -47,6 +47,9 @@ namespace PowerTerminal
             Vm.ConnectionManager.Connections.CollectionChanged +=
                 (_, _) => App.RebuildJumpList(Vm.ConnectionManager.Connections);
 
+            // Load the configured palette shortcut (default: Ctrl+Ctrl).
+            ReloadPaletteShortcut();
+
             // Handle --connect <guid> from a taskbar jump list click.
             Loaded += OnWindowLoaded;
         }
@@ -145,14 +148,62 @@ namespace PowerTerminal
 
         // ── Command Palette ───────────────────────────────────────────────────
 
-        private DateTime _lastCtrlPress = DateTime.MinValue;
+        private string   _paletteShortcut = "Ctrl+Ctrl";
+        private DateTime _lastCtrlPress   = DateTime.MinValue;
         private CommandPaletteWindow? _palette;
+
+        internal void ReloadPaletteShortcut()
+        {
+            _paletteShortcut = new ConfigService().LoadSettings().CommandPaletteShortcut
+                               ?? "Ctrl+Ctrl";
+        }
+
+        /// <summary>
+        /// Returns true when the configured palette shortcut is triggered by this key event.
+        /// Handles double-Ctrl, single-key (F12), and modifier+key (Ctrl+Space, Ctrl+F12, …).
+        /// </summary>
+        private bool TryTriggerPalette(KeyEventArgs e)
+        {
+            string sc = _paletteShortcut;
+
+            if (sc.Equals("Ctrl+Ctrl", StringComparison.OrdinalIgnoreCase))
+            {
+                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+                {
+                    var now = DateTime.UtcNow;
+                    if ((now - _lastCtrlPress).TotalMilliseconds < 400)
+                    {
+                        _lastCtrlPress = DateTime.MinValue;
+                        return true;
+                    }
+                    _lastCtrlPress = now;
+                }
+                return false;
+            }
+
+            // Parse "Modifier+Key" or plain "Key"
+            var parts   = sc.Split('+');
+            var keyName = parts[^1].Trim();
+            if (!Enum.TryParse<Key>(keyName, ignoreCase: true, out var key)) return false;
+            if (e.Key != key) return false;
+
+            var required = ModifierKeys.None;
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                var mod = parts[i].Trim();
+                if (mod.Equals("Ctrl",  StringComparison.OrdinalIgnoreCase)) required |= ModifierKeys.Control;
+                if (mod.Equals("Alt",   StringComparison.OrdinalIgnoreCase)) required |= ModifierKeys.Alt;
+                if (mod.Equals("Shift", StringComparison.OrdinalIgnoreCase)) required |= ModifierKeys.Shift;
+            }
+            return Keyboard.Modifiers == required;
+        }
 
         private void OpenCommandPalette()
         {
             if (_palette != null && _palette.IsLoaded) { _palette.Activate(); return; }
 
             var activeTab = Vm.ActiveTerminalTab;
+            if (activeTab == null || !activeTab.IsConnected) return;
 
             // Build system-vars dict from the active tab's machine info (empty if no connection)
             var sysVars = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -212,18 +263,11 @@ namespace PowerTerminal
         // Intercept it here so it never fires, letting PreviewKeyDown in TerminalControl handle it.
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            // Double-Ctrl opens the command palette
-            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            if (TryTriggerPalette(e))
             {
-                var now = DateTime.UtcNow;
-                if ((now - _lastCtrlPress).TotalMilliseconds < 400)
-                {
-                    _lastCtrlPress = DateTime.MinValue;
-                    OpenCommandPalette();
-                    e.Handled = true;
-                    return;
-                }
-                _lastCtrlPress = now;
+                OpenCommandPalette();
+                e.Handled = true;
+                return;
             }
 
             if (e.Key == Key.F1 && FocusManager.GetFocusedElement(this) is TerminalControl)

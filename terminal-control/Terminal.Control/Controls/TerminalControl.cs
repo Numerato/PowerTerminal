@@ -953,7 +953,7 @@ public sealed class TerminalControl : FrameworkElement
         return true;
     }
 
-    private string GetSelectedText()
+    public string GetSelectedText()
     {
         if (_selStart == null || _selEnd == null) return "";
         var buf = _emulator?.Buffer;

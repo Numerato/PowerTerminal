@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "Title": "Make Directory",
     "Tags": [ "files" ],
@@ -18,10 +18,22 @@
     "Description": "List all files with human-readable sizes"
   },
   {
+    "Title": "List Files (tree)",
+    "Tags": [ "files" ],
+    "Command": "tree -L $depth$ $path$",
+    "Description": "Show directory contents as a tree up to given depth"
+  },
+  {
     "Title": "Copy File",
     "Tags": [ "files" ],
     "Command": "cp $source$ $dest$",
     "Description": "Copy a file or directory to a new location"
+  },
+  {
+    "Title": "Copy Recursive",
+    "Tags": [ "files" ],
+    "Command": "cp -r $source$ $dest$",
+    "Description": "Recursively copy a directory and all its contents"
   },
   {
     "Title": "Move / Rename",
@@ -48,10 +60,40 @@
     "Description": "Search the entire filesystem for files matching a pattern"
   },
   {
+    "Title": "Find Files in Directory",
+    "Tags": [ "files", "search" ],
+    "Command": "find $path$ -type f -name \"$pattern$\"",
+    "Description": "Search a specific directory for matching files"
+  },
+  {
+    "Title": "Find Files Modified Recently",
+    "Tags": [ "files", "search" ],
+    "Command": "find $path$ -type f -mtime -$days$",
+    "Description": "Find files modified within the last N days"
+  },
+  {
+    "Title": "Find Large Files",
+    "Tags": [ "files", "search", "disk" ],
+    "Command": "find $path$ -type f -size +$size$M | sort",
+    "Description": "Find files larger than N megabytes"
+  },
+  {
     "Title": "Show File Contents",
     "Tags": [ "files" ],
     "Command": "cat $file$",
     "Description": "Print the full contents of a file to stdout"
+  },
+  {
+    "Title": "Show File Head",
+    "Tags": [ "files" ],
+    "Command": "head -n $lines$ $file$",
+    "Description": "Print the first N lines of a file"
+  },
+  {
+    "Title": "Show File Tail",
+    "Tags": [ "files" ],
+    "Command": "tail -n $lines$ $file$",
+    "Description": "Print the last N lines of a file"
   },
   {
     "Title": "Tail Log File",
@@ -60,10 +102,40 @@
     "Description": "Stream new lines as they are appended to a log file"
   },
   {
+    "Title": "Page Through File",
+    "Tags": [ "files" ],
+    "Command": "less $file$",
+    "Description": "Interactively scroll through file contents"
+  },
+  {
+    "Title": "Word / Line Count",
+    "Tags": [ "files", "text" ],
+    "Command": "wc -l $file$",
+    "Description": "Count the number of lines in a file"
+  },
+  {
+    "Title": "File Type Info",
+    "Tags": [ "files" ],
+    "Command": "file $file$",
+    "Description": "Determine and print the type of a file"
+  },
+  {
+    "Title": "File / Inode Details",
+    "Tags": [ "files" ],
+    "Command": "stat $file$",
+    "Description": "Show detailed metadata: size, permissions, timestamps, inode"
+  },
+  {
     "Title": "Disk Usage of Directory",
-    "Tags": [ "files", "system" ],
+    "Tags": [ "files", "system", "disk" ],
     "Command": "du -sh $path$",
     "Description": "Show total disk usage of a directory in human-readable form"
+  },
+  {
+    "Title": "Disk Usage Sorted",
+    "Tags": [ "files", "disk" ],
+    "Command": "du -h --max-depth=1 $path$ | sort -rh | head -20",
+    "Description": "Show top-20 largest subdirectories sorted by size"
   },
   {
     "Title": "Set File Permissions",
@@ -72,10 +144,22 @@
     "Description": "Change read/write/execute permissions on a file"
   },
   {
+    "Title": "Set Permissions Recursive",
+    "Tags": [ "files" ],
+    "Command": "chmod -R $mode$ $path$",
+    "Description": "Recursively change permissions on a directory tree"
+  },
+  {
     "Title": "Change Owner",
     "Tags": [ "files" ],
     "Command": "chown $user$:$group$ $file$",
     "Description": "Change the owning user and group of a file"
+  },
+  {
+    "Title": "Change Owner Recursive",
+    "Tags": [ "files" ],
+    "Command": "chown -R $user$:$group$ $path$",
+    "Description": "Recursively change ownership of a directory tree"
   },
   {
     "Title": "Create Symlink",
@@ -85,15 +169,117 @@
   },
   {
     "Title": "Archive with tar",
-    "Tags": [ "files" ],
+    "Tags": [ "files", "compression" ],
     "Command": "tar -czvf $archive$.tar.gz $folder$",
     "Description": "Compress a folder into a gzipped tarball archive"
   },
   {
     "Title": "Extract tar.gz",
-    "Tags": [ "files" ],
+    "Tags": [ "files", "compression" ],
     "Command": "tar -xzvf $archive$.tar.gz",
     "Description": "Extract a gzipped tarball to the current directory"
+  },
+  {
+    "Title": "Extract tar.gz to Path",
+    "Tags": [ "files", "compression" ],
+    "Command": "tar -xzvf $archive$.tar.gz -C $dest$",
+    "Description": "Extract a gzipped tarball to a specific destination directory"
+  },
+  {
+    "Title": "Zip Files",
+    "Tags": [ "files", "compression" ],
+    "Command": "zip -r $archive$.zip $folder$",
+    "Description": "Create a zip archive from a folder"
+  },
+  {
+    "Title": "Unzip Archive",
+    "Tags": [ "files", "compression" ],
+    "Command": "unzip $archive$.zip -d $dest$",
+    "Description": "Extract a zip archive to a destination directory"
+  },
+  {
+    "Title": "Rsync Local",
+    "Tags": [ "files" ],
+    "Command": "rsync -av --progress $source$ $dest$",
+    "Description": "Sync files locally with progress output"
+  },
+  {
+    "Title": "Rsync to Remote",
+    "Tags": [ "files", "network" ],
+    "Command": "rsync -avz -e ssh $source$ $user$@$host$:$dest$",
+    "Description": "Sync files to a remote host over SSH with compression"
+  },
+  {
+    "Title": "Diff Two Files",
+    "Tags": [ "files", "text" ],
+    "Command": "diff -u $file1$ $file2$",
+    "Description": "Show unified diff between two files"
+  },
+  {
+    "Title": "Search Text in File",
+    "Tags": [ "search", "text" ],
+    "Command": "grep -n \"$pattern$\" $file$",
+    "Description": "Find lines matching a pattern with line numbers"
+  },
+  {
+    "Title": "Search Recursively",
+    "Tags": [ "search", "text" ],
+    "Command": "grep -rn \"$pattern$\" $path$",
+    "Description": "Recursively search all files under a path for a pattern"
+  },
+  {
+    "Title": "Case-Insensitive Search",
+    "Tags": [ "search", "text" ],
+    "Command": "grep -in \"$pattern$\" $file$",
+    "Description": "Search for a pattern ignoring upper/lower case"
+  },
+  {
+    "Title": "Search with Context",
+    "Tags": [ "search", "text" ],
+    "Command": "grep -n -C 3 \"$pattern$\" $file$",
+    "Description": "Show matching lines plus 3 lines of surrounding context"
+  },
+  {
+    "Title": "Sed Replace In-Place",
+    "Tags": [ "text" ],
+    "Command": "sed -i 's/$find$/$replace$/g' $file$",
+    "Description": "Replace all occurrences of a string inside a file"
+  },
+  {
+    "Title": "Awk Print Column",
+    "Tags": [ "text" ],
+    "Command": "awk '{print $$col$}' $file$",
+    "Description": "Print a specific column from a whitespace-delimited file"
+  },
+  {
+    "Title": "Sort File",
+    "Tags": [ "text" ],
+    "Command": "sort $file$",
+    "Description": "Sort lines of a file alphabetically"
+  },
+  {
+    "Title": "Sort Unique",
+    "Tags": [ "text" ],
+    "Command": "sort -u $file$",
+    "Description": "Sort lines and remove duplicates"
+  },
+  {
+    "Title": "Count Occurrences",
+    "Tags": [ "text", "search" ],
+    "Command": "sort $file$ | uniq -c | sort -rn | head -20",
+    "Description": "Count and rank the most frequent lines in a file"
+  },
+  {
+    "Title": "Cut Fields",
+    "Tags": [ "text" ],
+    "Command": "cut -d'$delim$' -f$field$ $file$",
+    "Description": "Extract specific fields from each line using a delimiter"
+  },
+  {
+    "Title": "Translate Characters",
+    "Tags": [ "text" ],
+    "Command": "tr '$from$' '$to$' < $file$",
+    "Description": "Replace or delete characters read from a file"
   },
   {
     "Title": "Ping Host",
@@ -106,6 +292,12 @@
     "Tags": [ "network" ],
     "Command": "ip addr show",
     "Description": "Display IP addresses for all network interfaces"
+  },
+  {
+    "Title": "Show Routing Table",
+    "Tags": [ "network" ],
+    "Command": "ip route show",
+    "Description": "Print the kernel routing table"
   },
   {
     "Title": "My IP Address",
@@ -132,6 +324,18 @@
     "Description": "Download a file from a URL using curl"
   },
   {
+    "Title": "HTTP Headers (curl)",
+    "Tags": [ "network" ],
+    "Command": "curl -I $url$",
+    "Description": "Fetch and display only the HTTP response headers"
+  },
+  {
+    "Title": "curl with JSON",
+    "Tags": [ "network" ],
+    "Command": "curl -s -X POST $url$ -H 'Content-Type: application/json' -d '$json$'",
+    "Description": "POST a JSON payload and print the response"
+  },
+  {
     "Title": "Show Open Ports",
     "Tags": [ "network", "system" ],
     "Command": "ss -tlnp",
@@ -150,10 +354,34 @@
     "Description": "Query DNS records for a domain name"
   },
   {
+    "Title": "Reverse DNS Lookup",
+    "Tags": [ "network" ],
+    "Command": "dig -x $ip$",
+    "Description": "Resolve an IP address back to its hostname"
+  },
+  {
+    "Title": "nslookup",
+    "Tags": [ "network" ],
+    "Command": "nslookup $host$",
+    "Description": "Query a DNS server for a hostname or IP address"
+  },
+  {
     "Title": "SSH to Host",
     "Tags": [ "network" ],
     "Command": "ssh $username$@$host$",
     "Description": "Open an SSH session using the current username"
+  },
+  {
+    "Title": "SSH with Key",
+    "Tags": [ "network" ],
+    "Command": "ssh -i $keyfile$ $username$@$host$",
+    "Description": "Connect via SSH using a specific identity file"
+  },
+  {
+    "Title": "SSH Port Forward",
+    "Tags": [ "network" ],
+    "Command": "ssh -L $localport$:$remotehost$:$remoteport$ $user$@$gateway$",
+    "Description": "Create an SSH local port-forwarding tunnel"
   },
   {
     "Title": "SCP Copy to Remote",
@@ -162,10 +390,58 @@
     "Description": "Securely copy a local file to a remote server"
   },
   {
+    "Title": "SCP Copy from Remote",
+    "Tags": [ "network", "files" ],
+    "Command": "scp $username$@$host$:$remotefile$ $localpath$",
+    "Description": "Securely copy a file from a remote server"
+  },
+  {
+    "Title": "Generate SSH Key",
+    "Tags": [ "network", "security" ],
+    "Command": "ssh-keygen -t ed25519 -C \"$comment$\" -f $keyfile$",
+    "Description": "Generate a new Ed25519 SSH key pair"
+  },
+  {
+    "Title": "Copy SSH Key to Server",
+    "Tags": [ "network", "security" ],
+    "Command": "ssh-copy-id -i $keyfile$.pub $user$@$host$",
+    "Description": "Install a public SSH key on a remote server"
+  },
+  {
     "Title": "Firewall Status",
-    "Tags": [ "network", "system" ],
+    "Tags": [ "network", "system", "firewall" ],
     "Command": "sudo ufw status verbose",
     "Description": "Show current UFW firewall rules and their status"
+  },
+  {
+    "Title": "UFW Allow Port",
+    "Tags": [ "network", "firewall" ],
+    "Command": "sudo ufw allow $port$/tcp",
+    "Description": "Open a TCP port in the UFW firewall"
+  },
+  {
+    "Title": "UFW Deny Port",
+    "Tags": [ "network", "firewall" ],
+    "Command": "sudo ufw deny $port$/tcp",
+    "Description": "Block a TCP port in the UFW firewall"
+  },
+  {
+    "Title": "iptables List Rules",
+    "Tags": [ "network", "firewall" ],
+    "Command": "sudo iptables -L -n -v",
+    "Description": "List all iptables rules with packet/byte counters"
+  },
+  {
+    "Title": "Nmap Port Scan",
+    "Tags": [ "network", "security" ],
+    "Command": "nmap -p $ports$ $host$",
+    "Description": "Scan specific ports on a host (requires nmap)"
+  },
+  {
+    "Title": "Nmap Service Scan",
+    "Tags": [ "network", "security" ],
+    "Command": "nmap -sV $host$",
+    "Description": "Detect services and versions running on open ports"
   },
   {
     "Title": "System Update (apt)",
@@ -187,19 +463,19 @@
   },
   {
     "Title": "Memory Usage",
-    "Tags": [ "system" ],
+    "Tags": [ "system", "monitoring" ],
     "Command": "free -h",
     "Description": "Display RAM and swap usage in human-readable form"
   },
   {
     "Title": "CPU & Load Snapshot",
-    "Tags": [ "system" ],
+    "Tags": [ "system", "monitoring" ],
     "Command": "top -bn1 | head -20",
     "Description": "Print a one-shot snapshot of CPU usage and load"
   },
   {
     "Title": "Disk Space",
-    "Tags": [ "system" ],
+    "Tags": [ "system", "disk" ],
     "Command": "df -h",
     "Description": "Show free and used disk space for all mounted filesystems"
   },
@@ -210,22 +486,106 @@
     "Description": "Print kernel name, version, and architecture"
   },
   {
+    "Title": "Hostname",
+    "Tags": [ "system" ],
+    "Command": "hostnamectl",
+    "Description": "Show or set the system hostname and OS details"
+  },
+  {
+    "Title": "Set Hostname",
+    "Tags": [ "system" ],
+    "Command": "sudo hostnamectl set-hostname $newhostname$",
+    "Description": "Permanently change the machine hostname"
+  },
+  {
+    "Title": "Current Date/Time",
+    "Tags": [ "system" ],
+    "Command": "date",
+    "Description": "Print the current system date and time"
+  },
+  {
+    "Title": "Uptime",
+    "Tags": [ "system", "monitoring" ],
+    "Command": "uptime",
+    "Description": "Show how long the system has been running and load average"
+  },
+  {
+    "Title": "CPU Info",
+    "Tags": [ "system", "monitoring" ],
+    "Command": "lscpu",
+    "Description": "Display CPU architecture information"
+  },
+  {
+    "Title": "Hardware Info",
+    "Tags": [ "system" ],
+    "Command": "sudo lshw -short",
+    "Description": "Print a short summary of hardware components"
+  },
+  {
+    "Title": "PCI Devices",
+    "Tags": [ "system" ],
+    "Command": "lspci",
+    "Description": "List all PCI devices in the system"
+  },
+  {
+    "Title": "USB Devices",
+    "Tags": [ "system" ],
+    "Command": "lsusb",
+    "Description": "List all USB devices currently attached"
+  },
+  {
+    "Title": "Block Devices",
+    "Tags": [ "system", "disk" ],
+    "Command": "lsblk -f",
+    "Description": "List block devices with filesystem type and mount point"
+  },
+  {
+    "Title": "Mount Point Info",
+    "Tags": [ "system", "disk" ],
+    "Command": "mount | column -t",
+    "Description": "Show all currently mounted filesystems in tabular form"
+  },
+  {
+    "Title": "Mount Disk",
+    "Tags": [ "system", "disk" ],
+    "Command": "sudo mount $device$ $mountpoint$",
+    "Description": "Mount a block device at a given mount point"
+  },
+  {
+    "Title": "Unmount Disk",
+    "Tags": [ "system", "disk" ],
+    "Command": "sudo umount $mountpoint$",
+    "Description": "Unmount a filesystem from its mount point"
+  },
+  {
+    "Title": "Kernel Ring Buffer",
+    "Tags": [ "system", "logs" ],
+    "Command": "dmesg | tail -50",
+    "Description": "Show the last 50 kernel log messages"
+  },
+  {
     "Title": "Running Services",
     "Tags": [ "system" ],
     "Command": "systemctl list-units --type=service --state=running",
     "Description": "List all currently active and running systemd services"
   },
   {
-    "Title": "Journal Logs",
-    "Tags": [ "system", "logs" ],
-    "Command": "sudo journalctl -xe",
-    "Description": "Show recent systemd journal entries with context lines"
+    "Title": "Service Status",
+    "Tags": [ "system" ],
+    "Command": "systemctl status $service$",
+    "Description": "Show current status and recent log of a systemd service"
   },
   {
-    "Title": "Failed Services",
+    "Title": "Start Service",
     "Tags": [ "system" ],
-    "Command": "systemctl --failed",
-    "Description": "List all systemd units that have entered a failed state"
+    "Command": "sudo systemctl start $service$",
+    "Description": "Start a systemd service immediately"
+  },
+  {
+    "Title": "Stop Service",
+    "Tags": [ "system" ],
+    "Command": "sudo systemctl stop $service$",
+    "Description": "Stop a running systemd service"
   },
   {
     "Title": "Restart Service",
@@ -234,20 +594,68 @@
     "Description": "Restart a named systemd service immediately"
   },
   {
+    "Title": "Reload Service",
+    "Tags": [ "system" ],
+    "Command": "sudo systemctl reload $service$",
+    "Description": "Ask a service to reload its configuration without restarting"
+  },
+  {
     "Title": "Enable Service on Boot",
     "Tags": [ "system" ],
     "Command": "sudo systemctl enable $service$",
     "Description": "Mark a service to start automatically on boot"
   },
   {
-    "Title": "Who Is Logged In",
+    "Title": "Disable Service",
     "Tags": [ "system" ],
+    "Command": "sudo systemctl disable $service$",
+    "Description": "Prevent a service from starting automatically on boot"
+  },
+  {
+    "Title": "Journal Logs",
+    "Tags": [ "system", "logs" ],
+    "Command": "sudo journalctl -xe",
+    "Description": "Show recent systemd journal entries with context lines"
+  },
+  {
+    "Title": "Journal for Service",
+    "Tags": [ "system", "logs" ],
+    "Command": "journalctl -u $service$ -f",
+    "Description": "Follow live log output for a specific systemd service"
+  },
+  {
+    "Title": "Journal Since Boot",
+    "Tags": [ "system", "logs" ],
+    "Command": "journalctl -b",
+    "Description": "Show all journal entries since the last boot"
+  },
+  {
+    "Title": "Failed Services",
+    "Tags": [ "system" ],
+    "Command": "systemctl --failed",
+    "Description": "List all systemd units that have entered a failed state"
+  },
+  {
+    "Title": "Time & Timezone",
+    "Tags": [ "system" ],
+    "Command": "timedatectl",
+    "Description": "Show system date, time, timezone and NTP sync status"
+  },
+  {
+    "Title": "Set Timezone",
+    "Tags": [ "system" ],
+    "Command": "sudo timedatectl set-timezone $timezone$",
+    "Description": "Change the system timezone (e.g. Europe/Amsterdam)"
+  },
+  {
+    "Title": "Who Is Logged In",
+    "Tags": [ "system", "users" ],
     "Command": "who",
     "Description": "Show a list of currently logged-in users"
   },
   {
     "Title": "Last Logins",
-    "Tags": [ "system" ],
+    "Tags": [ "system", "users" ],
     "Command": "last -20",
     "Description": "Display the 20 most recent login records"
   },
@@ -256,6 +664,36 @@
     "Tags": [ "system" ],
     "Command": "printenv | sort",
     "Description": "Print all environment variables sorted alphabetically"
+  },
+  {
+    "Title": "Watch Command",
+    "Tags": [ "system", "monitoring" ],
+    "Command": "watch -n $seconds$ $command$",
+    "Description": "Run a command repeatedly every N seconds"
+  },
+  {
+    "Title": "IO Statistics",
+    "Tags": [ "system", "monitoring", "disk" ],
+    "Command": "iostat -x 1 5",
+    "Description": "Show extended disk I/O statistics every second, 5 times"
+  },
+  {
+    "Title": "Virtual Memory Stats",
+    "Tags": [ "system", "monitoring" ],
+    "Command": "vmstat 1 5",
+    "Description": "Print virtual memory, I/O and CPU stats 5 times at 1s intervals"
+  },
+  {
+    "Title": "Open Files by Process",
+    "Tags": [ "system", "process" ],
+    "Command": "lsof -p $pid$",
+    "Description": "List all files and sockets opened by a process ID"
+  },
+  {
+    "Title": "Open Files on Port",
+    "Tags": [ "system", "network" ],
+    "Command": "lsof -i :$port$",
+    "Description": "Show which process is listening on a given port"
   },
   {
     "Title": "Install Package (apt)",
@@ -276,10 +714,28 @@
     "Description": "Search available apt packages by keyword"
   },
   {
+    "Title": "Package Info",
+    "Tags": [ "packages" ],
+    "Command": "apt-cache show $package$",
+    "Description": "Display detailed information about an apt package"
+  },
+  {
     "Title": "List Installed Packages",
     "Tags": [ "packages" ],
     "Command": "dpkg -l | grep $pattern$",
     "Description": "List installed packages matching a search pattern"
+  },
+  {
+    "Title": "Which Files a Package Owns",
+    "Tags": [ "packages" ],
+    "Command": "dpkg -L $package$",
+    "Description": "List all files installed by a package"
+  },
+  {
+    "Title": "Which Package Owns File",
+    "Tags": [ "packages" ],
+    "Command": "dpkg -S $file$",
+    "Description": "Find which package provides a specific file"
   },
   {
     "Title": "Autoremove Unused",
@@ -288,10 +744,28 @@
     "Description": "Remove packages that are no longer needed as dependencies"
   },
   {
+    "Title": "Install Package (yum)",
+    "Tags": [ "packages" ],
+    "Command": "sudo yum install $package$ -y",
+    "Description": "Install a package via yum (RHEL/CentOS/Fedora)"
+  },
+  {
+    "Title": "Install Package (dnf)",
+    "Tags": [ "packages" ],
+    "Command": "sudo dnf install $package$ -y",
+    "Description": "Install a package via dnf (Fedora/RHEL 8+)"
+  },
+  {
     "Title": "List All Processes",
     "Tags": [ "process" ],
     "Command": "ps aux",
     "Description": "Show all running processes with CPU and memory usage"
+  },
+  {
+    "Title": "Process Tree",
+    "Tags": [ "process" ],
+    "Command": "pstree -p",
+    "Description": "Display running processes as a tree with PIDs"
   },
   {
     "Title": "Kill Process by Name",
@@ -313,8 +787,308 @@
   },
   {
     "Title": "Interactive Process Viewer",
-    "Tags": [ "process", "system" ],
+    "Tags": [ "process", "monitoring" ],
     "Command": "htop",
     "Description": "Launch interactive process viewer (requires htop installed)"
+  },
+  {
+    "Title": "Run in Background",
+    "Tags": [ "process" ],
+    "Command": "nohup $command$ &",
+    "Description": "Run a command immune to hangup signals, in background"
+  },
+  {
+    "Title": "Nice Priority",
+    "Tags": [ "process" ],
+    "Command": "nice -n $priority$ $command$",
+    "Description": "Start a command with adjusted CPU scheduling priority (-20 to 19)"
+  },
+  {
+    "Title": "Renice Process",
+    "Tags": [ "process" ],
+    "Command": "renice $priority$ -p $pid$",
+    "Description": "Change the scheduling priority of a running process"
+  },
+  {
+    "Title": "Strace Process",
+    "Tags": [ "process" ],
+    "Command": "strace -p $pid$",
+    "Description": "Trace system calls made by a running process"
+  },
+  {
+    "Title": "Add User",
+    "Tags": [ "users" ],
+    "Command": "sudo adduser $username$",
+    "Description": "Create a new user account interactively"
+  },
+  {
+    "Title": "Delete User",
+    "Tags": [ "users" ],
+    "Command": "sudo deluser --remove-home $username$",
+    "Description": "Remove a user account and their home directory"
+  },
+  {
+    "Title": "Change Password",
+    "Tags": [ "users" ],
+    "Command": "sudo passwd $username$",
+    "Description": "Set or change a user's password"
+  },
+  {
+    "Title": "Add User to Group",
+    "Tags": [ "users" ],
+    "Command": "sudo usermod -aG $group$ $username$",
+    "Description": "Add a user to a supplementary group (e.g. sudo, docker)"
+  },
+  {
+    "Title": "List Groups",
+    "Tags": [ "users" ],
+    "Command": "groups $username$",
+    "Description": "Show all groups a user belongs to"
+  },
+  {
+    "Title": "Current User Info",
+    "Tags": [ "users" ],
+    "Command": "id",
+    "Description": "Print UID, GID and group memberships for the current user"
+  },
+  {
+    "Title": "Add Group",
+    "Tags": [ "users" ],
+    "Command": "sudo groupadd $groupname$",
+    "Description": "Create a new user group"
+  },
+  {
+    "Title": "Switch User",
+    "Tags": [ "users" ],
+    "Command": "su - $username$",
+    "Description": "Switch to another user account with a login shell"
+  },
+  {
+    "Title": "List sudo Privileges",
+    "Tags": [ "users", "security" ],
+    "Command": "sudo -l",
+    "Description": "List commands the current user may run with sudo"
+  },
+  {
+    "Title": "Git Status",
+    "Tags": [ "git" ],
+    "Command": "git status",
+    "Description": "Show the working tree status and staged changes"
+  },
+  {
+    "Title": "Git Log",
+    "Tags": [ "git" ],
+    "Command": "git log --oneline --graph --all -20",
+    "Description": "Show last 20 commits as a compact graph across all branches"
+  },
+  {
+    "Title": "Git Diff",
+    "Tags": [ "git" ],
+    "Command": "git diff",
+    "Description": "Show unstaged changes in the working tree"
+  },
+  {
+    "Title": "Git Diff Staged",
+    "Tags": [ "git" ],
+    "Command": "git diff --cached",
+    "Description": "Show changes that are staged for the next commit"
+  },
+  {
+    "Title": "Git Pull",
+    "Tags": [ "git" ],
+    "Command": "git pull",
+    "Description": "Fetch and merge changes from the upstream branch"
+  },
+  {
+    "Title": "Git Push",
+    "Tags": [ "git" ],
+    "Command": "git push",
+    "Description": "Push local commits to the remote repository"
+  },
+  {
+    "Title": "Git Add All",
+    "Tags": [ "git" ],
+    "Command": "git add -A",
+    "Description": "Stage all changes (new, modified and deleted files)"
+  },
+  {
+    "Title": "Git Commit",
+    "Tags": [ "git" ],
+    "Command": "git commit -m \"$message$\"",
+    "Description": "Create a commit with a message"
+  },
+  {
+    "Title": "Git Clone",
+    "Tags": [ "git" ],
+    "Command": "git clone $url$",
+    "Description": "Clone a remote repository into a new local directory"
+  },
+  {
+    "Title": "Git Checkout Branch",
+    "Tags": [ "git" ],
+    "Command": "git checkout $branch$",
+    "Description": "Switch to an existing branch"
+  },
+  {
+    "Title": "Git New Branch",
+    "Tags": [ "git" ],
+    "Command": "git checkout -b $branch$",
+    "Description": "Create and switch to a new branch"
+  },
+  {
+    "Title": "Git Stash",
+    "Tags": [ "git" ],
+    "Command": "git stash",
+    "Description": "Save the current working tree changes to a stash"
+  },
+  {
+    "Title": "Git Stash Pop",
+    "Tags": [ "git" ],
+    "Command": "git stash pop",
+    "Description": "Apply the most recent stash and remove it from the stash list"
+  },
+  {
+    "Title": "Git Reset Hard",
+    "Tags": [ "git" ],
+    "Command": "git reset --hard HEAD",
+    "Description": "Discard all local changes and restore HEAD state"
+  },
+  {
+    "Title": "Git Remote List",
+    "Tags": [ "git" ],
+    "Command": "git remote -v",
+    "Description": "List configured remote repositories with their URLs"
+  },
+  {
+    "Title": "SSL Certificate Info",
+    "Tags": [ "security" ],
+    "Command": "openssl s_client -connect $host$:443 </dev/null 2>/dev/null | openssl x509 -noout -dates",
+    "Description": "Check the expiry dates of an HTTPS certificate"
+  },
+  {
+    "Title": "Generate Self-Signed Cert",
+    "Tags": [ "security" ],
+    "Command": "openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes",
+    "Description": "Create a self-signed TLS certificate valid for 365 days"
+  },
+  {
+    "Title": "Decode JWT Token",
+    "Tags": [ "security" ],
+    "Command": "echo $token$ | cut -d'.' -f2 | base64 -d 2>/dev/null | python3 -m json.tool",
+    "Description": "Pretty-print the payload section of a JWT token"
+  },
+  {
+    "Title": "Hash File (SHA256)",
+    "Tags": [ "security", "files" ],
+    "Command": "sha256sum $file$",
+    "Description": "Compute the SHA-256 checksum of a file"
+  },
+  {
+    "Title": "Certbot Renew",
+    "Tags": [ "security" ],
+    "Command": "sudo certbot renew --dry-run",
+    "Description": "Test Let's Encrypt certificate renewal without making changes"
+  },
+  {
+    "Title": "MySQL Connect",
+    "Tags": [ "database" ],
+    "Command": "mysql -u $user$ -p $database$",
+    "Description": "Connect to a MySQL/MariaDB database as a user"
+  },
+  {
+    "Title": "MySQL Dump",
+    "Tags": [ "database" ],
+    "Command": "mysqldump -u $user$ -p $database$ > $file$.sql",
+    "Description": "Export a MySQL database to a SQL file"
+  },
+  {
+    "Title": "MySQL Import",
+    "Tags": [ "database" ],
+    "Command": "mysql -u $user$ -p $database$ < $file$.sql",
+    "Description": "Import a SQL file into a MySQL database"
+  },
+  {
+    "Title": "PostgreSQL Connect",
+    "Tags": [ "database" ],
+    "Command": "psql -U $user$ -d $database$",
+    "Description": "Connect to a PostgreSQL database"
+  },
+  {
+    "Title": "PostgreSQL Dump",
+    "Tags": [ "database" ],
+    "Command": "pg_dump -U $user$ $database$ > $file$.sql",
+    "Description": "Export a PostgreSQL database to a SQL file"
+  },
+  {
+    "Title": "SQLite Open",
+    "Tags": [ "database" ],
+    "Command": "sqlite3 $file$.db",
+    "Description": "Open or create an SQLite database file"
+  },
+  {
+    "Title": "Crontab Edit",
+    "Tags": [ "cron" ],
+    "Command": "crontab -e",
+    "Description": "Open the current user's crontab for editing"
+  },
+  {
+    "Title": "Crontab List",
+    "Tags": [ "cron" ],
+    "Command": "crontab -l",
+    "Description": "List all cron jobs for the current user"
+  },
+  {
+    "Title": "System Cron Jobs",
+    "Tags": [ "cron" ],
+    "Command": "cat /etc/crontab && ls /etc/cron.d/",
+    "Description": "Show system-wide crontab and cron.d entries"
+  },
+  {
+    "Title": "Nginx Reload",
+    "Tags": [ "system" ],
+    "Command": "sudo nginx -t && sudo systemctl reload nginx",
+    "Description": "Test nginx configuration then reload it if valid"
+  },
+  {
+    "Title": "Apache Reload",
+    "Tags": [ "system" ],
+    "Command": "sudo apachectl configtest && sudo systemctl reload apache2",
+    "Description": "Test Apache configuration then reload it if valid"
+  },
+  {
+    "Title": "tmux New Session",
+    "Tags": [ "process" ],
+    "Command": "tmux new-session -s $session$",
+    "Description": "Create a new named tmux session"
+  },
+  {
+    "Title": "tmux List Sessions",
+    "Tags": [ "process" ],
+    "Command": "tmux list-sessions",
+    "Description": "Show all active tmux sessions"
+  },
+  {
+    "Title": "tmux Attach",
+    "Tags": [ "process" ],
+    "Command": "tmux attach-session -t $session$",
+    "Description": "Reconnect to an existing tmux session by name"
+  },
+  {
+    "Title": "Screen New Session",
+    "Tags": [ "process" ],
+    "Command": "screen -S $session$",
+    "Description": "Start a new named GNU screen session"
+  },
+  {
+    "Title": "Screen List",
+    "Tags": [ "process" ],
+    "Command": "screen -ls",
+    "Description": "List all active GNU screen sessions"
+  },
+  {
+    "Title": "Screen Attach",
+    "Tags": [ "process" ],
+    "Command": "screen -r $session$",
+    "Description": "Reconnect to a detached screen session"
   }
 ]

@@ -1,12 +1,14 @@
 using System;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using PowerTerminal.ViewModels;
 using Terminal.Ssh;
 
+// ReSharper disable once CheckNamespace — PowerTerminal.Views sub-namespace intentional
 namespace PowerTerminal.Views
 {
     public partial class TerminalTabView : System.Windows.Controls.UserControl
@@ -472,6 +474,55 @@ namespace PowerTerminal.Views
                 _vm.AutoConnectOnLoad = false;
                 _ = DoConnectAsync();
             }
+
+            // Inject "Create Command" into the terminal right-click context menu
+            Terminal.ContextMenuOpening += Terminal_ContextMenuOpening;
+        }
+
+        private void TerminalMenu_Copy(object sender, RoutedEventArgs e)
+        {
+            var text = Terminal.GetSelectedText();
+            if (!string.IsNullOrEmpty(text))
+                Clipboard.SetText(text);
+        }
+
+        private void TerminalMenu_Paste(object sender, RoutedEventArgs e)
+        {
+            if (Clipboard.ContainsText())
+                _vm?.SendData(Clipboard.GetText());
+        }
+
+        private void Terminal_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            var menu = Terminal.ContextMenu;
+            if (menu == null) return;
+
+            // Remove any previously injected separator+item
+            for (int i = menu.Items.Count - 1; i >= 0; i--)
+            {
+                if (menu.Items[i] is MenuItem mi && mi.Tag is "create-command")
+                    menu.Items.RemoveAt(i);
+                else if (menu.Items[i] is Separator sep && sep.Tag is "create-command-sep")
+                    menu.Items.RemoveAt(i);
+            }
+
+            string selectedText = Terminal.GetSelectedText();
+            if (string.IsNullOrWhiteSpace(selectedText)) return;
+
+            // Add separator + "Create Command" item
+            var sep2 = new Separator { Tag = "create-command-sep" };
+            var item = new MenuItem
+            {
+                Header = "Create Command from Selection",
+                Tag    = "create-command"
+            };
+            item.Click += (_, _) =>
+            {
+                var mainVm = (Window.GetWindow(this) as global::PowerTerminal.MainWindow)?.Vm;
+                mainVm?.OpenCommandsFromSelection(selectedText.Trim());
+            };
+            menu.Items.Add(sep2);
+            menu.Items.Add(item);
         }
 
         private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)

@@ -32,6 +32,7 @@ namespace PowerTerminal.ViewModels
             Variables = new VariablesViewModel(_config);
             ConnectionManager = new ConnectionManagerViewModel(_config);
             WikiEditor = new WikiEditorViewModel(_wiki);
+            Commands   = new CommandsViewModel(_config);
 
             // Wire wiki to prompt for variables via dialog
             Wiki.VariablePromptCallback = PromptVariable;
@@ -64,6 +65,7 @@ namespace PowerTerminal.ViewModels
         public VariablesViewModel       Variables         { get; }
         public ConnectionManagerViewModel ConnectionManager { get; }
         public WikiEditorViewModel      WikiEditor        { get; }
+        public CommandsViewModel        Commands          { get; }
         public RemoteExplorerViewModel? Explorer => _activeTerminalTab?.Explorer;
         public ConfigService            Config    => _config;
 
@@ -132,6 +134,7 @@ namespace PowerTerminal.ViewModels
                     OnPropertyChanged(nameof(ExplorerPanelActive));
                     OnPropertyChanged(nameof(SettingsPanelActive));
                     OnPropertyChanged(nameof(VariablesPanelActive));
+                    OnPropertyChanged(nameof(CommandsPanelActive));
                 }
             }
         }
@@ -142,6 +145,7 @@ namespace PowerTerminal.ViewModels
         public bool ExplorerPanelActive=> _activePanel == "explorer";
         public bool SettingsPanelActive=> _activePanel == "settings";
         public bool VariablesPanelActive => _activePanel == "variables";
+        public bool CommandsPanelActive  => _activePanel == "commands";
 
         private void TogglePanel(string? key)
         {
@@ -288,6 +292,16 @@ namespace PowerTerminal.ViewModels
             if (Wiki.SelectedEntry == null) return;
             _wiki.Delete(Wiki.SelectedEntry);
             Wiki.SearchQuery = string.Empty;
+        }
+
+        /// <summary>
+        /// Pre-fills the Commands panel edit form with <paramref name="commandText"/>
+        /// (from a terminal text selection) and opens the Commands panel.
+        /// </summary>
+        public void OpenCommandsFromSelection(string commandText)
+        {
+            Commands.StartNewFromSelection(commandText);
+            ActivePanel = "commands";
         }
 
         private string? PromptVariable(string name)

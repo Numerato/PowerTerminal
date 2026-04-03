@@ -1,0 +1,339 @@
+<UserControl x:Class="PowerTerminal.Views.CommandsPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:PowerTerminal.ViewModels"
+             Background="{StaticResource SurfaceBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Header -->
+            <RowDefinition Height="Auto"/>
+            <!-- Pack selector -->
+            <RowDefinition Height="Auto"/>
+            <!-- Command list -->
+            <RowDefinition Height="*"/>
+            <!-- Edit form -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ──────────────────────────────────────────────────── -->
+        <Border Grid.Row="0"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10">
+            <TextBlock Text="Commands"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+        </Border>
+
+        <!-- ── Pack selector ───────────────────────────────────────────── -->
+        <Border Grid.Row="1"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="10,8">
+            <StackPanel>
+                <!-- Normal mode: ComboBox + action buttons -->
+                <Grid Visibility="{Binding IsAddingPack, Converter={StaticResource BoolToInvisConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{Binding Packs}"
+                              SelectedItem="{Binding SelectedPack}"
+                              DisplayMemberPath="DisplayName"
+                              Margin="0,0,6,0"/>
+
+                    <!-- New Pack -->
+                    <Button Grid.Column="1"
+                            Content="+ Pack"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding NewPackCommand}"
+                            Margin="0,0,4,0"
+                            Padding="6,3"
+                            FontSize="12"
+                            ToolTip="Create a new command pack"/>
+
+                    <!-- Delete Pack -->
+                    <Button Grid.Column="2"
+                            Content="🗑"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding DeletePackCommand}"
+                            Padding="6,3"
+                            FontSize="12"
+                            ToolTip="Delete selected pack"/>
+                </Grid>
+
+                <!-- Add-pack mode: inline name input -->
+                <Grid Visibility="{Binding IsAddingPack, Converter={StaticResource BoolToVisConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox Grid.Column="0"
+                             Text="{Binding NewPackName, UpdateSourceTrigger=PropertyChanged}"
+                             x:Name="NewPackNameInput"
+                             Margin="0,0,6,0"
+                             ToolTip="Pack name (becomes filename)"/>
+
+                    <Button Grid.Column="1"
+                            Content="✓"
+                            Style="{StaticResource AccentButton}"
+                            Command="{Binding ConfirmPackCommand}"
+                            Margin="0,0,4,0"
+                            Padding="7,3"
+                            FontSize="12"
+                            ToolTip="Create pack"/>
+
+                    <Button Grid.Column="2"
+                            Content="✕"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding CancelPackCommand}"
+                            Padding="7,3"
+                            FontSize="12"
+                            ToolTip="Cancel"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ── Command list ────────────────────────────────────────────── -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- List header + New Command button -->
+            <Grid Grid.Row="0" Margin="10,6,10,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding SelectedPack.DisplayName}"
+                           FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Content="+ Command"
+                        Style="{StaticResource FlatButton}"
+                        Command="{Binding NewCommandCommand}"
+                        Padding="6,2"
+                        FontSize="12"
+                        ToolTip="Add a new command to this pack"/>
+            </Grid>
+
+            <!-- Search bar -->
+            <Border Grid.Row="1"
+                    Margin="10,0,10,6"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="#555555"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="&#xE721;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="#999"
+                               VerticalAlignment="Center"
+                               Margin="8,0,4,0"/>
+                    <TextBox Grid.Column="1"
+                             Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             CaretBrush="{StaticResource ForegroundBrush}"
+                             FontSize="13"
+                             Padding="0,5"
+                             VerticalContentAlignment="Center">
+                        <TextBox.Style>
+                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="TextBox">
+                                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
+                                                          HorizontalScrollBarVisibility="Hidden"
+                                                          VerticalScrollBarVisibility="Hidden"
+                                                          Margin="0"/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </TextBox.Style>
+                    </TextBox>
+                    <!-- Clear button — visible only when search has text -->
+                    <Button Grid.Column="2"
+                            Content="&#xE711;"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="11"
+                            Style="{StaticResource FlatButton}"
+                            Foreground="#888"
+                            Padding="6,0"
+                            Command="{Binding ClearSearchCommand}"
+                            Visibility="{Binding SearchQuery, Converter={StaticResource NullOrEmptyToVisInvertConverter}}"
+                            VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Empty state -->
+            <TextBlock Grid.Row="2"
+                       Text="No commands in this pack."
+                       FontSize="12"
+                       Foreground="{StaticResource ForegroundDimBrush}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Margin="0,20,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding FilteredCommands.Count}" Value="0">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedPack}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- Command items -->
+            <ListBox Grid.Row="2"
+                     ItemsSource="{Binding FilteredCommands}"
+                     SelectedItem="{Binding SelectedCommand}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     Background="Transparent"
+                     BorderThickness="0">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <Setter Property="Padding" Value="8,6"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0"
+                                       Text="{Binding Title}"
+                                       FontSize="13" FontWeight="Medium"
+                                       Foreground="{StaticResource ForegroundBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Command}"
+                                       FontSize="11"
+                                       FontFamily="Cascadia Code, Consolas, Courier New"
+                                       Foreground="#7EC8A0"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,2,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <!-- ── Edit form ────────────────────────────────────────────────── -->
+        <Border Grid.Row="3"
+                BorderBrush="{StaticResource AccentBrush}"
+                BorderThickness="0,1.5,0,0"
+                Background="#100D08"
+                Padding="10,10,10,12"
+                Visibility="{Binding IsEditFormVisible, Converter={StaticResource BoolToVisConverter}}">
+            <StackPanel>
+                <!-- Form title row -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock FontSize="12" FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="Edit Command"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsEditingExisting}" Value="False">
+                                        <Setter Property="Text" Value="New Command"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button Grid.Column="1"
+                            Content="✕"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding CancelEditCommand}"
+                            Padding="5,2"
+                            FontSize="11"
+                            ToolTip="Close form"/>
+                </Grid>
+
+                <!-- Title -->
+                <TextBlock Text="Title" FontSize="11" Foreground="{StaticResource ForegroundDimBrush}" Margin="0,0,0,2"/>
+                <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,7"
+                         Padding="6,4"/>
+
+                <!-- Command -->
+                <TextBlock Text="Command" FontSize="11" Foreground="{StaticResource ForegroundDimBrush}" Margin="0,0,0,2"/>
+                <TextBox Text="{Binding EditCommand, UpdateSourceTrigger=PropertyChanged}"
+                         FontFamily="Cascadia Code, Consolas, Courier New"
+                         FontSize="12"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         MinHeight="48"
+                         MaxHeight="96"
+                         VerticalScrollBarVisibility="Auto"
+                         Padding="6,4"
+                         Margin="0,0,0,7"/>
+
+                <!-- Description -->
+                <TextBlock Text="Description" FontSize="11" Foreground="{StaticResource ForegroundDimBrush}" Margin="0,0,0,2"/>
+                <TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="6,4"
+                         Margin="0,0,0,7"/>
+
+                <!-- Tags -->
+                <TextBlock Text="Tags (comma-separated)" FontSize="11" Foreground="{StaticResource ForegroundDimBrush}" Margin="0,0,0,2"/>
+                <TextBox Text="{Binding EditTags, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="6,4"
+                         Margin="0,0,0,10"/>
+
+                <!-- Action buttons -->
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Save"
+                            Style="{StaticResource AccentButton}"
+                            Command="{Binding SaveCommandCommand}"
+                            Padding="14,5"
+                            Margin="0,0,6,0"/>
+                    <Button Content="Cancel"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding CancelEditCommand}"
+                            Padding="10,5"
+                            Margin="0,0,6,0"/>
+                    <Button Content="🗑 Delete"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding DeleteCommandCommand}"
+                            Padding="10,5"
+                            Visibility="{Binding IsEditingExisting, Converter={StaticResource BoolToVisConverter}}"
+                            Foreground="#E05555"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -17,7 +17,14 @@
                               FontSize="{Binding Theme.FontSize}"
                               BackgroundColor="{StaticResource BackgroundColor}"
                               Margin="{Binding TerminalPadding}"
-                              ScrollbackChanged="Terminal_ScrollbackChanged"/>
+                              ScrollbackChanged="Terminal_ScrollbackChanged">
+            <ctrl:TerminalControl.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy"  Click="TerminalMenu_Copy"  InputGestureText="Ctrl+Shift+C"/>
+                    <MenuItem Header="Paste" Click="TerminalMenu_Paste" InputGestureText="Ctrl+Shift+V"/>
+                </ContextMenu>
+            </ctrl:TerminalControl.ContextMenu>
+        </ctrl:TerminalControl>
 
         <ScrollBar x:Name="TerminalScrollBar"
                    Grid.Column="1"

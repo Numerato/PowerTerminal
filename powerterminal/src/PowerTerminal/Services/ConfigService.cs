@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PowerTerminal.Models;
@@ -75,6 +76,7 @@ namespace PowerTerminal.Services
             string logDir = Path.GetFullPath(Path.Combine(_baseDir, "..", "logs"));
             Directory.CreateDirectory(logDir);
             WriteStartupDiagnostic(logDir);
+            EnsureDefaultPersonalPack();
         }
 
         /// <summary>Always writes a brief startup entry to help diagnose config-path issues.</summary>
@@ -257,6 +259,82 @@ namespace PowerTerminal.Services
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// Loads all command packs individually, preserving which commands belong to which file.
+        /// Returns a list of (fileName, commands) tuples, sorted by filename.
+        /// </summary>
+        public List<(string FileName, List<LinuxCommand> Commands)> LoadCommandPacks()
+        {
+            var result = new List<(string, List<LinuxCommand>)>();
+            string dir = CommandDir;
+            if (!Directory.Exists(dir))
+                return result;
+            foreach (string file in Directory.GetFiles(dir, "*.json").OrderBy(f => f))
+            {
+                try
+                {
+                    string json = File.ReadAllText(file);
+                    var commands = JsonSerializer.Deserialize<List<LinuxCommand>>(json, JsonOptions)
+                                   ?? new List<LinuxCommand>();
+                    result.Add((Path.GetFileName(file), commands));
+                }
+                catch
+                {
+                    // skip malformed pack files; still show them as empty
+                    result.Add((Path.GetFileName(file), new List<LinuxCommand>()));
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Overwrites a single pack file with the given commands.</summary>
+        public void SaveCommandPack(string fileName, IEnumerable<LinuxCommand> commands)
+        {
+            string path = Path.Combine(CommandDir, fileName);
+            File.WriteAllText(path, JsonSerializer.Serialize(commands, JsonOptions));
+        }
+
+        /// <summary>
+        /// Creates a new empty pack file.
+        /// <paramref name="displayName"/> is sanitized to a safe filename.
+        /// Returns the final filename (e.g. "my_pack.json").
+        /// </summary>
+        public string CreateCommandPack(string displayName)
+        {
+            string safe = SanitizeFileName(displayName);
+            if (string.IsNullOrWhiteSpace(safe)) safe = "pack";
+            string fileName = safe + ".json";
+            string path     = Path.Combine(CommandDir, fileName);
+            // Avoid clobbering an existing file
+            int n = 2;
+            while (File.Exists(path))
+            {
+                fileName = $"{safe}_{n++}.json";
+                path     = Path.Combine(CommandDir, fileName);
+            }
+            File.WriteAllText(path, JsonSerializer.Serialize(new List<LinuxCommand>(), JsonOptions));
+            return fileName;
+        }
+
+        /// <summary>Deletes a pack file by filename. Silently ignores missing files.</summary>
+        public void DeleteCommandPack(string fileName)
+        {
+            string path = Path.Combine(CommandDir, fileName);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        /// <summary>
+        /// Creates <c>personal.json</c> in the commands/ directory if it does not already exist.
+        /// Called during startup so there is always a writable pack for user-created commands.
+        /// </summary>
+        private void EnsureDefaultPersonalPack()
+        {
+            string path = Path.Combine(CommandDir, "personal.json");
+            if (!File.Exists(path))
+                File.WriteAllText(path, JsonSerializer.Serialize(new List<LinuxCommand>(), JsonOptions));
         }
 
         private static string SanitizeFileName(string name)

@@ -11,7 +11,9 @@ namespace PowerTerminal.Views
         {
             InitializeComponent();
             PromptLabel.Text = $"Enter value for: {variableName}";
-            Loaded += (_, _) => ValueInput.Focus();
+            Loaded += (_, _) => Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Input,
+                (Action)(() => ValueInput.Focus()));
         }
 
         private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)

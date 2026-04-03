@@ -378,6 +378,20 @@
                          Foreground="White"/>
             </ToggleButton>
 
+            <!-- Commands -->
+            <ToggleButton Style="{StaticResource SidebarButton}"
+                          IsChecked="{Binding CommandsPanelActive, Mode=OneWay}"
+                          Command="{Binding TogglePanelCommand}"
+                          CommandParameter="commands"
+                          ToolTip="Commands"
+                          Margin="0,0,0,6"
+                          ToolTipService.InitialShowDelay="0">
+              <TextBlock Text="&#xE756;"
+                         FontFamily="Segoe MDL2 Assets"
+                         FontSize="14"
+                         Foreground="White"/>
+            </ToggleButton>
+
           </StackPanel>
         </Border>
 
@@ -483,6 +497,11 @@
               <!-- Variables panel -->
               <views:VariablesView DataContext="{Binding Variables}"
                           Visibility="{Binding DataContext.VariablesPanelActive,
+                                       RelativeSource={RelativeSource AncestorType=Window},
+                                       Converter={StaticResource BoolToVisConverter}}"/>
+              <!-- Commands panel -->
+              <views:CommandsPanelView DataContext="{Binding Commands}"
+                          Visibility="{Binding DataContext.CommandsPanelActive,
                                        RelativeSource={RelativeSource AncestorType=Window},
                                        Converter={StaticResource BoolToVisConverter}}"/>
             </Grid>

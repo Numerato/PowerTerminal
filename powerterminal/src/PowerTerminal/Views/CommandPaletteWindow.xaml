@@ -15,8 +15,8 @@
         Deactivated="Window_Deactivated"
         PreviewKeyDown="Window_PreviewKeyDown">
 
-    <Border BorderBrush="#3A3A3A"
-            BorderThickness="1"
+    <Border BorderBrush="#666666"
+            BorderThickness="1.5"
             CornerRadius="10"
             Background="#1A1A1A"
             ClipToBounds="True">
@@ -33,34 +33,49 @@
             <Border Grid.Row="0"
                     Background="#222222"
                     BorderBrush="#2A2A2A"
-                    BorderThickness="0,0,0,1">
-                <Grid Margin="12,0">
+                    BorderThickness="0,0,0,1"
+                    Padding="10,7">
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="⌘"
-                               FontSize="16"
-                               Foreground="#777777"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="1"
-                             x:Name="SearchBox"
-                             Style="{StaticResource PromptTextBox}"
-                             Foreground="#E8E8E8"
-                             Background="Transparent"
-                             CaretBrush="{StaticResource AccentBrush}"
-                             FontSize="16"
-                             Padding="0,13"
-                             Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Type to search commands, tags, or descriptions"/>
-                    <TextBlock Grid.Column="2"
+                    <!-- Search input with visible rounded border -->
+                    <Border Grid.Column="0"
+                            Background="#2C2C2C"
+                            BorderBrush="#555555"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Padding="8,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="🔍"
+                                       FontSize="12"
+                                       Foreground="#BBBBBB"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,6,0"/>
+                            <TextBox Grid.Column="1"
+                                     x:Name="SearchBox"
+                                     Style="{StaticResource PromptTextBox}"
+                                     Foreground="#F0F0F0"
+                                     Background="Transparent"
+                                     CaretBrush="{StaticResource AccentBrush}"
+                                     FontSize="14"
+                                     BorderThickness="0"
+                                     Padding="0,7"
+                                     Text="{Binding SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
+                    </Border>
+                    <TextBlock Grid.Column="1"
                                x:Name="ResultCount"
                                FontSize="12"
-                               Foreground="#666666"
-                               VerticalAlignment="Center"/>
+                               Foreground="#AAAAAA"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"/>
                 </Grid>
             </Border>
 
@@ -154,7 +169,8 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                 <!-- Title row -->
-                                <TextBlock Text="{Binding Title}"
+                                <TextBlock x:Name="TitleText"
+                                           Text="{Binding Title}"
                                            FontSize="14"
                                            FontWeight="Medium"
                                            Foreground="#E0E0E0"
@@ -227,9 +243,9 @@
                                    Foreground="#777777"
                                    Margin="0,0,0,4"/>
                         <!-- Rich command with variable segments (built in code-behind) -->
-                        <Border Background="#0D0D0D"
-                                BorderBrush="#2E2E2E"
-                                BorderThickness="1"
+                        <Border Background="#15100A"
+                                BorderBrush="#E87722"
+                                BorderThickness="2,1,1,1"
                                 CornerRadius="4"
                                 Padding="8,5">
                             <TextBlock x:Name="DetailCmdBlock"
@@ -261,21 +277,17 @@
                     BorderThickness="0,1,0,0"
                     Padding="14,7">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="12" Foreground="#666666" Margin="0,0,16,0">
+                    <TextBlock FontSize="12" Foreground="#999999" Margin="0,0,16,0">
                         <Run Text="↑↓"/>
-                        <Run Text=" navigate" Foreground="#555555"/>
+                        <Run Text=" navigate" Foreground="#888888"/>
                     </TextBlock>
-                    <TextBlock FontSize="12" Foreground="#666666" Margin="0,0,16,0">
+                    <TextBlock FontSize="12" Foreground="#999999" Margin="0,0,16,0">
                         <Run Text="Enter"/>
-                        <Run Text=" send to terminal" Foreground="#555555"/>
+                        <Run Text=" insert to terminal" Foreground="#888888"/>
                     </TextBlock>
-                    <TextBlock FontSize="12" Foreground="#666666" Margin="0,0,16,0">
-                        <Run Text="Tab"/>
-                        <Run Text=" insert only" Foreground="#555555"/>
-                    </TextBlock>
-                    <TextBlock FontSize="12" Foreground="#666666">
+                    <TextBlock FontSize="12" Foreground="#999999">
                         <Run Text="Esc"/>
-                        <Run Text=" close" Foreground="#555555"/>
+                        <Run Text=" close" Foreground="#888888"/>
                     </TextBlock>
                 </StackPanel>
             </Border>
