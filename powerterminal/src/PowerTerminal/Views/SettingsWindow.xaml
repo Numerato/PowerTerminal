@@ -215,6 +215,30 @@
                                      Content="Classic  (drag to select &amp; auto-copy; right-click pastes)"
                                      Foreground="{StaticResource ForegroundBrush}"
                                      Margin="10,0,0,8"/>
+
+                        <Separator Margin="0,12,0,12"/>
+
+                        <!-- Command Palette -->
+                        <TextBlock Text="Command Palette"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Content="Open shortcut:"/>
+                            <TextBox Grid.Column="1"
+                                     x:Name="CommandPaletteShortcutInput"
+                                     ToolTip="Ctrl+Ctrl = double-press Ctrl. Other options: F12, Ctrl+Space, etc."/>
+                        </Grid>
+                        <TextBlock Text="'Ctrl+Ctrl' triggers on two Ctrl presses within 400ms. Press double-Ctrl anywhere to open the palette."
+                                   Foreground="{StaticResource ForegroundDimBrush}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Margin="140,0,0,8"/>
                     </StackPanel>
                 </ScrollViewer>
 

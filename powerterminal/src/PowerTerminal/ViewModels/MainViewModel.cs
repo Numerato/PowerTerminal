@@ -29,11 +29,14 @@ namespace PowerTerminal.ViewModels
 
             AiChat = new AiChatViewModel(_ai, _log);
             Wiki   = new WikiViewModel(_wiki, _log);
+            Variables = new VariablesViewModel(_config);
             ConnectionManager = new ConnectionManagerViewModel(_config);
             WikiEditor = new WikiEditorViewModel(_wiki);
 
             // Wire wiki to prompt for variables via dialog
             Wiki.VariablePromptCallback = PromptVariable;
+            // Wire wiki to resolve custom variables from the Variables panel
+            Wiki.CustomVariablesProvider = () => Variables.CustomVariables;
             WikiEditor.SaveRequested   += () => { _wiki.LoadAll(); Wiki.SearchQuery = string.Empty; };
 
             AddTabCommand              = new RelayCommand(_ => AddNewTab());
@@ -58,9 +61,11 @@ namespace PowerTerminal.ViewModels
 
         public AiChatViewModel          AiChat            { get; }
         public WikiViewModel            Wiki              { get; }
+        public VariablesViewModel       Variables         { get; }
         public ConnectionManagerViewModel ConnectionManager { get; }
         public WikiEditorViewModel      WikiEditor        { get; }
         public RemoteExplorerViewModel? Explorer => _activeTerminalTab?.Explorer;
+        public ConfigService            Config    => _config;
 
         public ICommand AddTabCommand                 { get; }
         public ICommand OpenConnectionManagerCommand  { get; }
@@ -84,16 +89,35 @@ namespace PowerTerminal.ViewModels
             get => _activeTerminalTab;
             set
             {
+                var previous = _activeTerminalTab;
                 if (Set(ref _activeTerminalTab, value))
                 {
+                    // Unsubscribe from old tab so we don't leak listeners.
+                    if (previous != null)
+                        previous.PropertyChanged -= OnActiveTabPropertyChanged;
+                    // Subscribe to new tab — refreshes variables when MachineInfo arrives.
+                    if (value != null)
+                        value.PropertyChanged += OnActiveTabPropertyChanged;
+
                     foreach (var tab in TerminalTabs)
                         tab.IsActive = (tab == value);
                     Wiki.ActiveTerminal = value;
+                    Variables.RefreshSystemVariables(value);
                     OnPropertyChanged(nameof(Explorer));
                 }
             }
         }
 
+        /// <summary>
+        /// Fires whenever the active tab raises <see cref="System.ComponentModel.INotifyPropertyChanged"/>.
+        /// Used to re-populate the Variables panel as soon as <see cref="TerminalTabViewModel.MachineInfo"/>
+        /// is set (i.e. immediately after the SSH handshake completes).
+        /// </summary>
+        private void OnActiveTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(TerminalTabViewModel.MachineInfo))
+                Variables.RefreshSystemVariables(_activeTerminalTab);
+        }
         /// <summary>Currently open sidebar panel key, or null when the panel is closed.</summary>
         public string? ActivePanel
         {
@@ -107,6 +131,7 @@ namespace PowerTerminal.ViewModels
                     OnPropertyChanged(nameof(AiChatPanelActive));
                     OnPropertyChanged(nameof(ExplorerPanelActive));
                     OnPropertyChanged(nameof(SettingsPanelActive));
+                    OnPropertyChanged(nameof(VariablesPanelActive));
                 }
             }
         }
@@ -116,6 +141,7 @@ namespace PowerTerminal.ViewModels
         public bool AiChatPanelActive  => _activePanel == "aichat";
         public bool ExplorerPanelActive=> _activePanel == "explorer";
         public bool SettingsPanelActive=> _activePanel == "settings";
+        public bool VariablesPanelActive => _activePanel == "variables";
 
         private void TogglePanel(string? key)
         {
@@ -226,22 +252,35 @@ namespace PowerTerminal.ViewModels
         private void PopulateEditorVariables()
         {
             var t = ActiveTerminalTab;
-            WikiEditor.SetVariables(new[]
+            var sysVars = new[]
             {
-                new Models.VariableItem { Name = "$currentdirectory$", Value = t?.CurrentDirectory ?? string.Empty },
-                new Models.VariableItem { Name = "$operatingsystem$",  Value = t?.OperatingSystem  ?? string.Empty },
-                new Models.VariableItem { Name = "$version$",          Value = t?.OsVersion        ?? string.Empty },
-                new Models.VariableItem { Name = "$homefolder$",       Value = t?.HomeFolder       ?? string.Empty },
-                new Models.VariableItem { Name = "$hardware$",         Value = t?.Hardware         ?? string.Empty },
-                new Models.VariableItem { Name = "$disksizes$",        Value = t?.DiskSizes        ?? string.Empty },
-                new Models.VariableItem { Name = "$ipaddress$",        Value = t?.IpAddress        ?? string.Empty },
-                new Models.VariableItem { Name = "$hostname$",         Value = t?.Hostname         ?? string.Empty },
-                new Models.VariableItem { Name = "$cpu$",              Value = t?.CpuInfo          ?? string.Empty },
-                new Models.VariableItem { Name = "$memory$",           Value = t?.TotalMemory      ?? string.Empty },
-                new Models.VariableItem { Name = "$username$",         Value = t?.Username         ?? string.Empty },
-                new Models.VariableItem { Name = "$uptime$",           Value = t?.Uptime           ?? string.Empty },
-                new Models.VariableItem { Name = "$kernelversion$",    Value = t?.KernelVersion    ?? string.Empty },
-            });
+                new VariableItem { Name = "$currentdirectory$", Value = t?.CurrentDirectory ?? string.Empty },
+                new VariableItem { Name = "$operatingsystem$",  Value = t?.OperatingSystem  ?? string.Empty },
+                new VariableItem { Name = "$version$",          Value = t?.OsVersion        ?? string.Empty },
+                new VariableItem { Name = "$homefolder$",       Value = t?.HomeFolder       ?? string.Empty },
+                new VariableItem { Name = "$hardware$",         Value = t?.Hardware         ?? string.Empty },
+                new VariableItem { Name = "$disksizes$",        Value = t?.DiskSizes        ?? string.Empty },
+                new VariableItem { Name = "$ipaddress$",        Value = t?.IpAddress        ?? string.Empty },
+                new VariableItem { Name = "$hostname$",         Value = t?.Hostname         ?? string.Empty },
+                new VariableItem { Name = "$cpu$",              Value = t?.CpuInfo          ?? string.Empty },
+                new VariableItem { Name = "$memory$",           Value = t?.TotalMemory      ?? string.Empty },
+                new VariableItem { Name = "$username$",         Value = t?.Username         ?? string.Empty },
+                new VariableItem { Name = "$kernelversion$",    Value = t?.KernelVersion    ?? string.Empty },
+                new VariableItem { Name = "$defaultshell$",     Value = t?.DefaultShell     ?? string.Empty },
+                new VariableItem { Name = "$timezone$",         Value = t?.Timezone         ?? string.Empty },
+                new VariableItem { Name = "$cpucount$",         Value = t?.CpuCount         ?? string.Empty },
+                new VariableItem { Name = "$freememory$",       Value = t?.FreeMemory       ?? string.Empty },
+                new VariableItem { Name = "$freedisk$",         Value = t?.FreeDisk         ?? string.Empty },
+                new VariableItem { Name = "$publicip$",         Value = t?.PublicIp         ?? string.Empty },
+                new VariableItem { Name = "$sudouser$",         Value = t?.SudoUser         ?? string.Empty },
+            };
+
+            // Combine system variables with custom variables for the editor reference panel.
+            var allVars = new System.Collections.Generic.List<VariableItem>(sysVars);
+            foreach (var cv in Variables.CustomVariables)
+                allVars.Add(new VariableItem { Name = cv.Name, Value = cv.Value });
+
+            WikiEditor.SetVariables(allVars);
         }
 
         private void DeleteWiki()

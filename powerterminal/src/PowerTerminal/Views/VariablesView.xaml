@@ -1,0 +1,240 @@
+<UserControl x:Class="PowerTerminal.Views.VariablesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:PowerTerminal.Models"
+             Background="{StaticResource SurfaceBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Panel header -->
+        <Border Grid.Row="0"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10">
+            <TextBlock Text="Variables"
+                       FontSize="14" FontWeight="SemiBold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+        </Border>
+
+        <!-- Scrollable content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- Column headers for system variables -->
+                <Grid Margin="16,10,16,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Variable"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource ForegroundDimBrush}"/>
+                    <TextBlock Grid.Column="1" Text="Current Value"
+                               FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource ForegroundDimBrush}"/>
+                </Grid>
+
+                <!-- System variables list -->
+                <ItemsControl ItemsSource="{Binding SystemVariables}" Margin="16,0,16,4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:VariableItem}">
+                            <Grid Margin="0,1,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Name}"
+                                           FontFamily="Cascadia Code, Consolas, Courier New"
+                                           FontSize="11"
+                                           Foreground="#7EC8A0"
+                                           VerticalAlignment="Center"
+                                           Padding="0,3"/>
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SelectableText}"
+                                         Text="{Binding Value, Mode=OneWay}"
+                                         FontSize="11"
+                                         TextWrapping="NoWrap"
+                                         ToolTip="{Binding Value}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Placeholder when no terminal active -->
+                <TextBlock Text="No active terminal — connect to a server to populate."
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="11"
+                           Margin="16,2,16,8"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding SystemVariables.Count,
+                                        Converter={StaticResource ZeroCountToVisConverter}}"/>
+
+                <Separator Margin="16,8,16,0" Background="{StaticResource BorderBrush}"/>
+
+                <!-- ── Custom Variables ─────────────────────────────── -->
+                <Border BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="16,10,16,10">
+                    <TextBlock Text="Custom Variables"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+
+                <!-- Custom variables list (read-only display with 3-dot menu) -->
+                <ItemsControl ItemsSource="{Binding CustomVariables}" Margin="16,4,16,4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:CustomVariable}">
+                            <Grid Margin="0,1,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Name (read-only, red if duplicate) -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="⚠"
+                                               FontSize="11"
+                                               Foreground="#E85A5A"
+                                               Margin="0,0,4,0"
+                                               ToolTip="Duplicate variable name"
+                                               Visibility="{Binding IsDuplicate, Converter={StaticResource BoolToVisConverter}}"/>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontFamily="Cascadia Code, Consolas, Courier New"
+                                               FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Padding="0,3">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#7EC8A0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDuplicate}" Value="True">
+                                                        <Setter Property="Foreground" Value="#E85A5A"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                                <!-- Value (read-only, copyable) -->
+                                <TextBox Grid.Column="1"
+                                         Style="{StaticResource SelectableText}"
+                                         Text="{Binding Value, Mode=OneWay}"
+                                         FontSize="11"
+                                         TextWrapping="NoWrap"
+                                         Padding="4,0"
+                                         ToolTip="{Binding Value}"/>
+                                <!-- 3-dot menu -->
+                                <Button Grid.Column="2"
+                                        Content="⋮"
+                                        Style="{StaticResource FlatButton}"
+                                        FontSize="14"
+                                        FontWeight="Bold"
+                                        Padding="6,2"
+                                        VerticalAlignment="Center"
+                                        Click="VariableMenuButton_Click"
+                                        Tag="{Binding}">
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Edit"
+                                                      Click="EditVariable_Click"
+                                                      Tag="{Binding}"/>
+                                            <MenuItem Header="Delete"
+                                                      Click="DeleteVariable_Click"
+                                                      Tag="{Binding}"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Placeholder when no custom variables -->
+                <TextBlock Text="No custom variables yet. Add one below."
+                           Foreground="{StaticResource ForegroundDimBrush}"
+                           FontSize="11"
+                           Margin="16,2,16,8"
+                           Visibility="{Binding CustomVariables.Count,
+                                        Converter={StaticResource ZeroCountToVisConverter}}"/>
+
+                <!-- ── Add new variable form ─────────────────────────── -->
+                <Border BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="16,12,16,16"
+                        Margin="0,8,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Add New Variable"
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource ForegroundBrush}"
+                                   Margin="0,0,0,8"/>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     x:Name="NewNameBox"
+                                     Style="{StaticResource PromptTextBox}"
+                                     Text="{Binding NewVariableName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Foreground="#E8A45A"
+                                     CaretBrush="{StaticResource ForegroundBrush}"
+                                     Margin="0,0,4,0"
+                                     ToolTip="Variable name ($ delimiters added automatically)"/>
+                            <TextBox Grid.Column="1"
+                                     Style="{StaticResource PromptTextBox}"
+                                     Text="{Binding NewVariableValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     CaretBrush="{StaticResource ForegroundBrush}"
+                                     ToolTip="Variable value"/>
+                        </Grid>
+
+                        <!-- Duplicate warning -->
+                        <TextBlock Text="⚠ A variable with this name already exists"
+                                   FontSize="11"
+                                   Foreground="#E85A5A"
+                                   Margin="0,0,0,6"
+                                   Visibility="{Binding IsNewNameDuplicate, Converter={StaticResource BoolToVisConverter}}"/>
+
+                        <!-- Hint labels under each input -->
+                        <Grid Margin="0,0,0,10"
+                              Visibility="{Binding IsNewNameDuplicate, Converter={StaticResource BoolToInvisConverter}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="e.g.  myserver  →  $myserver$"
+                                       FontSize="10" Foreground="{StaticResource ForegroundDimBrush}"
+                                       Margin="0,0,4,0"/>
+                            <TextBlock Grid.Column="1" Text="e.g.  192.168.1.100"
+                                       FontSize="10" Foreground="{StaticResource ForegroundDimBrush}"/>
+                        </Grid>
+
+                        <Button Content="Add Variable"
+                                Style="{StaticResource AccentButton}"
+                                Command="{Binding AddCommand}"
+                                HorizontalAlignment="Left"
+                                Padding="12,6"
+                                FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Refresh button at the bottom -->
+                <Border Padding="16,12,16,16">
+                    <Button Content="Refresh"
+                            Style="{StaticResource FlatButton}"
+                            Command="{Binding RefreshCommand}"
+                            FontSize="11" Padding="8,4"
+                            HorizontalAlignment="Right"
+                            ToolTip="Refresh variables from active terminal"/>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
+

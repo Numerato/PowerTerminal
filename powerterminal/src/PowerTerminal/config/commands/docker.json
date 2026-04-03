@@ -1,0 +1,62 @@
+[
+  {
+    "Title": "List Containers",
+    "Tags": [ "docker" ],
+    "Command": "docker ps -a",
+    "Description": "Show all Docker containers including stopped ones"
+  },
+  {
+    "Title": "Docker Compose Up",
+    "Tags": [ "docker" ],
+    "Command": "docker compose up -d",
+    "Description": "Start services defined in docker-compose.yml in background"
+  },
+  {
+    "Title": "Docker Compose Down",
+    "Tags": [ "docker" ],
+    "Command": "docker compose down",
+    "Description": "Stop and remove all containers from docker-compose.yml"
+  },
+  {
+    "Title": "Docker Compose Logs",
+    "Tags": [ "docker", "logs" ],
+    "Command": "docker compose logs -f",
+    "Description": "Follow live log output from all compose services"
+  },
+  {
+    "Title": "Container Logs",
+    "Tags": [ "docker", "logs" ],
+    "Command": "docker logs -f $container$",
+    "Description": "Follow live log output from a named container"
+  },
+  {
+    "Title": "Shell into Container",
+    "Tags": [ "docker" ],
+    "Command": "docker exec -it $container$ /bin/bash",
+    "Description": "Open an interactive shell inside a running container"
+  },
+  {
+    "Title": "Pull Image",
+    "Tags": [ "docker" ],
+    "Command": "docker pull $image$",
+    "Description": "Download a Docker image from a registry"
+  },
+  {
+    "Title": "Remove Stopped Containers",
+    "Tags": [ "docker" ],
+    "Command": "docker container prune -f",
+    "Description": "Delete all stopped containers without confirmation prompt"
+  },
+  {
+    "Title": "List Images",
+    "Tags": [ "docker" ],
+    "Command": "docker images",
+    "Description": "List all locally available Docker images"
+  },
+  {
+    "Title": "Remove Unused Images",
+    "Tags": [ "docker" ],
+    "Command": "docker image prune -a -f",
+    "Description": "Remove all images not used by any container"
+  }
+]

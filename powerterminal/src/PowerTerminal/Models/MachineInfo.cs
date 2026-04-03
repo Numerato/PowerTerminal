@@ -15,8 +15,14 @@ namespace PowerTerminal.Models
         public string TotalMemory { get; set; } = string.Empty;
         public string DiskSizes { get; set; } = string.Empty;
         public string IpAddress { get; set; } = string.Empty;
-        public string Uptime { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
+        public string DefaultShell { get; set; } = string.Empty;
+        public string Timezone { get; set; } = string.Empty;
+        public string CpuCount { get; set; } = string.Empty;
+        public string FreeMemory { get; set; } = string.Empty;
+        public string FreeDisk { get; set; } = string.Empty;
+        public string PublicIp { get; set; } = string.Empty;
+        public string SudoUser { get; set; } = string.Empty;
         public DateTime LastUpdated { get; set; } = DateTime.Now;
     }
 }

@@ -128,29 +128,31 @@
                     <GridViewColumn Header="Name" Width="170">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Name}"
-                                           FontSize="13"
-                                           Foreground="{StaticResource ForegroundBrush}"
-                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBox Style="{StaticResource SelectableText}"
+                                         Text="{Binding Name, Mode=OneWay}"
+                                         FontSize="13"
+                                         TextWrapping="NoWrap"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn Header="Size" Width="70">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding SizeDisplay}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource ForegroundDimBrush}"
-                                           HorizontalAlignment="Right"/>
+                                <TextBox Style="{StaticResource SelectableText}"
+                                         Text="{Binding SizeDisplay, Mode=OneWay}"
+                                         FontSize="12"
+                                         Foreground="{StaticResource ForegroundDimBrush}"
+                                         HorizontalAlignment="Right"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn Header="Modified" Width="120">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Modified}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource ForegroundDimBrush}"/>
+                                <TextBox Style="{StaticResource SelectableText}"
+                                         Text="{Binding Modified, Mode=OneWay}"
+                                         FontSize="12"
+                                         Foreground="{StaticResource ForegroundDimBrush}"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>

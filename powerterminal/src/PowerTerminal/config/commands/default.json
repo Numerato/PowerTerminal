@@ -1,0 +1,320 @@
+[
+  {
+    "Title": "Make Directory",
+    "Tags": [ "files" ],
+    "Command": "mkdir -p $dirname$",
+    "Description": "Create a directory and all intermediate parents"
+  },
+  {
+    "Title": "Remove Directory",
+    "Tags": [ "files" ],
+    "Command": "rm -rf $dirname$",
+    "Description": "Recursively delete a directory and all its contents"
+  },
+  {
+    "Title": "List Files (detailed)",
+    "Tags": [ "files" ],
+    "Command": "ls -lah $path$",
+    "Description": "List all files with human-readable sizes"
+  },
+  {
+    "Title": "Copy File",
+    "Tags": [ "files" ],
+    "Command": "cp $source$ $dest$",
+    "Description": "Copy a file or directory to a new location"
+  },
+  {
+    "Title": "Move / Rename",
+    "Tags": [ "files" ],
+    "Command": "mv $source$ $dest$",
+    "Description": "Move or rename a file or directory"
+  },
+  {
+    "Title": "Delete File",
+    "Tags": [ "files" ],
+    "Command": "rm $file$",
+    "Description": "Remove a single file permanently"
+  },
+  {
+    "Title": "Create Empty File",
+    "Tags": [ "files" ],
+    "Command": "touch $filename$",
+    "Description": "Create an empty file or update its modification time"
+  },
+  {
+    "Title": "Find Files by Name",
+    "Tags": [ "files", "search" ],
+    "Command": "find / -name \"$pattern$\" 2>/dev/null",
+    "Description": "Search the entire filesystem for files matching a pattern"
+  },
+  {
+    "Title": "Show File Contents",
+    "Tags": [ "files" ],
+    "Command": "cat $file$",
+    "Description": "Print the full contents of a file to stdout"
+  },
+  {
+    "Title": "Tail Log File",
+    "Tags": [ "files", "logs" ],
+    "Command": "tail -f $logfile$",
+    "Description": "Stream new lines as they are appended to a log file"
+  },
+  {
+    "Title": "Disk Usage of Directory",
+    "Tags": [ "files", "system" ],
+    "Command": "du -sh $path$",
+    "Description": "Show total disk usage of a directory in human-readable form"
+  },
+  {
+    "Title": "Set File Permissions",
+    "Tags": [ "files" ],
+    "Command": "chmod $mode$ $file$",
+    "Description": "Change read/write/execute permissions on a file"
+  },
+  {
+    "Title": "Change Owner",
+    "Tags": [ "files" ],
+    "Command": "chown $user$:$group$ $file$",
+    "Description": "Change the owning user and group of a file"
+  },
+  {
+    "Title": "Create Symlink",
+    "Tags": [ "files" ],
+    "Command": "ln -s $target$ $link$",
+    "Description": "Create a symbolic link pointing to a target path"
+  },
+  {
+    "Title": "Archive with tar",
+    "Tags": [ "files" ],
+    "Command": "tar -czvf $archive$.tar.gz $folder$",
+    "Description": "Compress a folder into a gzipped tarball archive"
+  },
+  {
+    "Title": "Extract tar.gz",
+    "Tags": [ "files" ],
+    "Command": "tar -xzvf $archive$.tar.gz",
+    "Description": "Extract a gzipped tarball to the current directory"
+  },
+  {
+    "Title": "Ping Host",
+    "Tags": [ "network" ],
+    "Command": "ping -c 4 $host$",
+    "Description": "Send 4 ICMP echo requests to test connectivity"
+  },
+  {
+    "Title": "Show IP Addresses",
+    "Tags": [ "network" ],
+    "Command": "ip addr show",
+    "Description": "Display IP addresses for all network interfaces"
+  },
+  {
+    "Title": "My IP Address",
+    "Tags": [ "network", "system" ],
+    "Command": "echo $ipaddress$",
+    "Description": "Print the current machine IP address (system variable)"
+  },
+  {
+    "Title": "Test Port",
+    "Tags": [ "network" ],
+    "Command": "nc -zv $host$ $port$",
+    "Description": "Check if a specific TCP port is open on a remote host"
+  },
+  {
+    "Title": "Download File (wget)",
+    "Tags": [ "network" ],
+    "Command": "wget -O $output$ $url$",
+    "Description": "Download a file from a URL using wget"
+  },
+  {
+    "Title": "Download File (curl)",
+    "Tags": [ "network" ],
+    "Command": "curl -o $output$ $url$",
+    "Description": "Download a file from a URL using curl"
+  },
+  {
+    "Title": "Show Open Ports",
+    "Tags": [ "network", "system" ],
+    "Command": "ss -tlnp",
+    "Description": "List all listening TCP ports with associated process names"
+  },
+  {
+    "Title": "Trace Route",
+    "Tags": [ "network" ],
+    "Command": "traceroute $host$",
+    "Description": "Print network hops between this machine and a destination"
+  },
+  {
+    "Title": "DNS Lookup",
+    "Tags": [ "network" ],
+    "Command": "dig $domain$",
+    "Description": "Query DNS records for a domain name"
+  },
+  {
+    "Title": "SSH to Host",
+    "Tags": [ "network" ],
+    "Command": "ssh $username$@$host$",
+    "Description": "Open an SSH session using the current username"
+  },
+  {
+    "Title": "SCP Copy to Remote",
+    "Tags": [ "network", "files" ],
+    "Command": "scp $localfile$ $username$@$host$:$path$",
+    "Description": "Securely copy a local file to a remote server"
+  },
+  {
+    "Title": "Firewall Status",
+    "Tags": [ "network", "system" ],
+    "Command": "sudo ufw status verbose",
+    "Description": "Show current UFW firewall rules and their status"
+  },
+  {
+    "Title": "System Update (apt)",
+    "Tags": [ "system", "packages" ],
+    "Command": "sudo apt update && sudo apt upgrade -y",
+    "Description": "Refresh package list and upgrade all installed packages"
+  },
+  {
+    "Title": "Reboot",
+    "Tags": [ "system" ],
+    "Command": "sudo reboot",
+    "Description": "Restart the system immediately"
+  },
+  {
+    "Title": "Shutdown",
+    "Tags": [ "system" ],
+    "Command": "sudo shutdown -h now",
+    "Description": "Power off the machine without delay"
+  },
+  {
+    "Title": "Memory Usage",
+    "Tags": [ "system" ],
+    "Command": "free -h",
+    "Description": "Display RAM and swap usage in human-readable form"
+  },
+  {
+    "Title": "CPU & Load Snapshot",
+    "Tags": [ "system" ],
+    "Command": "top -bn1 | head -20",
+    "Description": "Print a one-shot snapshot of CPU usage and load"
+  },
+  {
+    "Title": "Disk Space",
+    "Tags": [ "system" ],
+    "Command": "df -h",
+    "Description": "Show free and used disk space for all mounted filesystems"
+  },
+  {
+    "Title": "System Info",
+    "Tags": [ "system" ],
+    "Command": "uname -a",
+    "Description": "Print kernel name, version, and architecture"
+  },
+  {
+    "Title": "Running Services",
+    "Tags": [ "system" ],
+    "Command": "systemctl list-units --type=service --state=running",
+    "Description": "List all currently active and running systemd services"
+  },
+  {
+    "Title": "Journal Logs",
+    "Tags": [ "system", "logs" ],
+    "Command": "sudo journalctl -xe",
+    "Description": "Show recent systemd journal entries with context lines"
+  },
+  {
+    "Title": "Failed Services",
+    "Tags": [ "system" ],
+    "Command": "systemctl --failed",
+    "Description": "List all systemd units that have entered a failed state"
+  },
+  {
+    "Title": "Restart Service",
+    "Tags": [ "system" ],
+    "Command": "sudo systemctl restart $service$",
+    "Description": "Restart a named systemd service immediately"
+  },
+  {
+    "Title": "Enable Service on Boot",
+    "Tags": [ "system" ],
+    "Command": "sudo systemctl enable $service$",
+    "Description": "Mark a service to start automatically on boot"
+  },
+  {
+    "Title": "Who Is Logged In",
+    "Tags": [ "system" ],
+    "Command": "who",
+    "Description": "Show a list of currently logged-in users"
+  },
+  {
+    "Title": "Last Logins",
+    "Tags": [ "system" ],
+    "Command": "last -20",
+    "Description": "Display the 20 most recent login records"
+  },
+  {
+    "Title": "Environment Variables",
+    "Tags": [ "system" ],
+    "Command": "printenv | sort",
+    "Description": "Print all environment variables sorted alphabetically"
+  },
+  {
+    "Title": "Install Package (apt)",
+    "Tags": [ "packages" ],
+    "Command": "sudo apt install $package$ -y",
+    "Description": "Install one or more packages via apt non-interactively"
+  },
+  {
+    "Title": "Remove Package",
+    "Tags": [ "packages" ],
+    "Command": "sudo apt remove --purge $package$ -y",
+    "Description": "Remove a package and its configuration files"
+  },
+  {
+    "Title": "Search Package",
+    "Tags": [ "packages" ],
+    "Command": "apt-cache search $query$",
+    "Description": "Search available apt packages by keyword"
+  },
+  {
+    "Title": "List Installed Packages",
+    "Tags": [ "packages" ],
+    "Command": "dpkg -l | grep $pattern$",
+    "Description": "List installed packages matching a search pattern"
+  },
+  {
+    "Title": "Autoremove Unused",
+    "Tags": [ "packages" ],
+    "Command": "sudo apt autoremove -y",
+    "Description": "Remove packages that are no longer needed as dependencies"
+  },
+  {
+    "Title": "List All Processes",
+    "Tags": [ "process" ],
+    "Command": "ps aux",
+    "Description": "Show all running processes with CPU and memory usage"
+  },
+  {
+    "Title": "Kill Process by Name",
+    "Tags": [ "process" ],
+    "Command": "pkill $name$",
+    "Description": "Send SIGTERM to all processes matching the given name"
+  },
+  {
+    "Title": "Kill by PID",
+    "Tags": [ "process" ],
+    "Command": "kill -9 $pid$",
+    "Description": "Forcefully terminate a process by its process ID"
+  },
+  {
+    "Title": "Find Process by Name",
+    "Tags": [ "process" ],
+    "Command": "pgrep -la $name$",
+    "Description": "Find PIDs and command lines matching a process name"
+  },
+  {
+    "Title": "Interactive Process Viewer",
+    "Tags": [ "process", "system" ],
+    "Command": "htop",
+    "Description": "Launch interactive process viewer (requires htop installed)"
+  }
+]

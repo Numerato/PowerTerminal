@@ -338,8 +338,14 @@ namespace PowerTerminal.Services
                 Task.Run(() => { info.TotalMemory     = RunCommand("free -h 2>/dev/null | awk '/^Mem:/{print $2}'").Trim(); }),
                 Task.Run(() => { info.DiskSizes       = RunCommand("df -h --total 2>/dev/null | tail -1 | awk '{print $2}'").Trim(); }),
                 Task.Run(() => { info.IpAddress       = RunCommand("hostname -I 2>/dev/null | awk '{print $1}'").Trim(); }),
-                Task.Run(() => { info.Uptime          = RunCommand("uptime -p 2>/dev/null || uptime").Trim(); }),
-                Task.Run(() => { info.Username        = RunCommand("whoami").Trim(); })
+                Task.Run(() => { info.Username        = RunCommand("whoami").Trim(); }),
+                Task.Run(() => { info.DefaultShell    = RunCommand("echo $SHELL").Trim(); }),
+                Task.Run(() => { info.Timezone        = RunCommand("cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || date +%Z").Trim(); }),
+                Task.Run(() => { info.CpuCount        = RunCommand("nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo").Trim(); }),
+                Task.Run(() => { info.FreeMemory      = RunCommand("free -h 2>/dev/null | awk '/^Mem:/{print $4}'").Trim(); }),
+                Task.Run(() => { info.FreeDisk        = RunCommand("df -h / 2>/dev/null | tail -1 | awk '{print $4}'").Trim(); }),
+                Task.Run(() => { info.PublicIp        = RunCommand("curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 api.ipify.org 2>/dev/null").Trim(); }),
+                Task.Run(() => { info.SudoUser        = RunCommand("logname 2>/dev/null || echo ${SUDO_USER:-$USER}").Trim(); })
             );
 
             info.LastUpdated = DateTime.Now;

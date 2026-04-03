@@ -34,6 +34,12 @@ namespace PowerTerminal.Models
 
         /// <summary>Controls copy/paste behaviour in the terminal (Classic or RightClickMenu).</summary>
         public TerminalCopyPasteMode TerminalCopyPasteMode { get; set; } = TerminalCopyPasteMode.RightClickMenu;
+
+        /// <summary>
+        /// Keyboard shortcut to open the command palette.
+        /// Use "Ctrl+Ctrl" for double-Ctrl, or a key name like "F12".
+        /// </summary>
+        public string CommandPaletteShortcut { get; set; } = "Ctrl+Ctrl";
     }
 
     public class AiSettings

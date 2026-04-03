@@ -71,6 +71,7 @@ namespace PowerTerminal.Services
         {
             Directory.CreateDirectory(_baseDir);
             Directory.CreateDirectory(Path.Combine(_baseDir, "wikis"));
+            Directory.CreateDirectory(Path.Combine(_baseDir, "commands"));
             string logDir = Path.GetFullPath(Path.Combine(_baseDir, "..", "logs"));
             Directory.CreateDirectory(logDir);
             WriteStartupDiagnostic(logDir);
@@ -91,8 +92,9 @@ namespace PowerTerminal.Services
             catch { /* diagnostic writes must never crash the app */ }
         }
 
-        public string BaseDir => _baseDir;
-        public string WikiDir => Path.Combine(_baseDir, "wikis");
+        public string BaseDir    => _baseDir;
+        public string WikiDir    => Path.Combine(_baseDir, "wikis");
+        public string CommandDir => Path.Combine(_baseDir, "commands");
         // Logs live next to config, under %APPDATA%\PowerTerminal\logs
         public string LogDir => Path.GetFullPath(Path.Combine(_baseDir, "..", "logs"));
 
@@ -201,6 +203,60 @@ namespace PowerTerminal.Services
                 if (File.Exists(path))
                     File.Delete(path);
             }
+        }
+
+        // ── Custom Variables ─────────────────────────────────────────────────
+
+        public List<CustomVariable> LoadCustomVariables()
+        {
+            string path = Path.Combine(_baseDir, "variables.json");
+            if (!File.Exists(path))
+                return new List<CustomVariable>();
+            try
+            {
+                string json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<List<CustomVariable>>(json, JsonOptions)
+                       ?? new List<CustomVariable>();
+            }
+            catch
+            {
+                return new List<CustomVariable>();
+            }
+        }
+
+        public void SaveCustomVariables(IEnumerable<CustomVariable> variables)
+        {
+            string path = Path.Combine(_baseDir, "variables.json");
+            File.WriteAllText(path, JsonSerializer.Serialize(variables, JsonOptions));
+        }
+
+        // ── Command Packs ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Loads all command packs from the commands/ directory.
+        /// Each *.json file is an array of <see cref="LinuxCommand"/>.
+        /// </summary>
+        public List<LinuxCommand> LoadAllCommands()
+        {
+            var result = new List<LinuxCommand>();
+            string dir = CommandDir;
+            if (!Directory.Exists(dir))
+                return result;
+            foreach (string file in Directory.GetFiles(dir, "*.json"))
+            {
+                try
+                {
+                    string json = File.ReadAllText(file);
+                    var pack = JsonSerializer.Deserialize<List<LinuxCommand>>(json, JsonOptions);
+                    if (pack != null)
+                        result.AddRange(pack);
+                }
+                catch
+                {
+                    // skip malformed pack files
+                }
+            }
+            return result;
         }
 
         private static string SanitizeFileName(string name)

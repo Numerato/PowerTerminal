@@ -106,8 +106,14 @@ namespace PowerTerminal.ViewModels
                 .Replace("$cpu$",               _activeTerminal.CpuInfo,          StringComparison.OrdinalIgnoreCase)
                 .Replace("$memory$",            _activeTerminal.TotalMemory,      StringComparison.OrdinalIgnoreCase)
                 .Replace("$username$",          _activeTerminal.Username,         StringComparison.OrdinalIgnoreCase)
-                .Replace("$uptime$",            _activeTerminal.Uptime,           StringComparison.OrdinalIgnoreCase)
-                .Replace("$kernelversion$",     _activeTerminal.KernelVersion,    StringComparison.OrdinalIgnoreCase);
+                .Replace("$kernelversion$",     _activeTerminal.KernelVersion,    StringComparison.OrdinalIgnoreCase)
+                .Replace("$defaultshell$",      _activeTerminal.DefaultShell,     StringComparison.OrdinalIgnoreCase)
+                .Replace("$timezone$",          _activeTerminal.Timezone,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$cpucount$",          _activeTerminal.CpuCount,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$freememory$",        _activeTerminal.FreeMemory,       StringComparison.OrdinalIgnoreCase)
+                .Replace("$freedisk$",          _activeTerminal.FreeDisk,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$publicip$",          _activeTerminal.PublicIp,         StringComparison.OrdinalIgnoreCase)
+                .Replace("$sudouser$",          _activeTerminal.SudoUser,         StringComparison.OrdinalIgnoreCase);
 
             // User variables: $variable:Name$
             result = VarPattern.Replace(result, m =>
@@ -115,6 +121,16 @@ namespace PowerTerminal.ViewModels
                 string varName = m.Groups[1].Value;
                 return PromptForVariable(varName) ?? m.Value;
             });
+
+            // Custom (user-defined) variables from the Variables panel.
+            if (CustomVariablesProvider != null)
+            {
+                foreach (var cv in CustomVariablesProvider())
+                {
+                    if (!string.IsNullOrEmpty(cv.Name))
+                        result = result.Replace(cv.Name, cv.Value, StringComparison.OrdinalIgnoreCase);
+                }
+            }
 
             return result;
         }
@@ -124,6 +140,12 @@ namespace PowerTerminal.ViewModels
         /// Override or hook into this in the View layer.
         /// </summary>
         public Func<string, string?>? VariablePromptCallback { get; set; }
+
+        /// <summary>
+        /// Optional provider for custom (user-defined) variables.
+        /// Set by <see cref="MainViewModel"/> to return the Variables panel's collection.
+        /// </summary>
+        public Func<IEnumerable<CustomVariable>>? CustomVariablesProvider { get; set; }
 
         private string? PromptForVariable(string name)
         {

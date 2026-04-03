@@ -8,12 +8,12 @@
 
         <!-- Text section template -->
         <DataTemplate x:Key="TextSectionTemplate" DataType="{x:Type models:WikiSection}">
-            <TextBlock Text="{Binding Content}"
-                       TextWrapping="Wrap"
-                       Foreground="{StaticResource ForegroundBrush}"
-                       FontFamily="Segoe UI, Arial"
-                       FontSize="13"
-                       Margin="0,0,0,8"/>
+            <TextBox Style="{StaticResource SelectableText}"
+                     Text="{Binding Content, Mode=OneWay}"
+                     TextWrapping="Wrap"
+                     FontFamily="Segoe UI, Arial"
+                     FontSize="13"
+                     Margin="0,0,0,8"/>
         </DataTemplate>
 
         <!-- Command block template -->
@@ -192,28 +192,32 @@
                       Padding="8">
             <StackPanel>
                 <!-- Entry header -->
-                <TextBlock Text="{Binding SelectedEntry.Title}"
-                           FontSize="16"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource ForegroundBrush}"
-                           Margin="0,0,0,4"
-                           Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}"/>
-                <TextBlock Text="{Binding SelectedEntry.Description}"
-                           FontSize="12"
-                           Foreground="{StaticResource ForegroundDimBrush}"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,4"
-                           Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}"/>
-                <TextBlock Foreground="{StaticResource AccentBrush}"
-                           FontSize="11"
-                           Margin="0,0,0,10"
-                           Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}">
-                    <TextBlock.Text>
+                <TextBox Style="{StaticResource SelectableText}"
+                         Text="{Binding SelectedEntry.Title, Mode=OneWay}"
+                         FontSize="16"
+                         FontWeight="Bold"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,4"
+                         Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}"/>
+                <TextBox Style="{StaticResource SelectableText}"
+                         Text="{Binding SelectedEntry.Description, Mode=OneWay}"
+                         FontSize="12"
+                         Foreground="{StaticResource ForegroundDimBrush}"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,4"
+                         Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}"/>
+                <TextBox Style="{StaticResource SelectableText}"
+                         FontSize="11"
+                         Foreground="{StaticResource AccentBrush}"
+                         TextWrapping="Wrap"
+                         Margin="0,0,0,10"
+                         Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}">
+                    <TextBox.Text>
                         <Binding Path="SelectedEntry.Tags"
                                  Converter="{StaticResource ListToStringConverter}"
                                  StringFormat="Tags: {0}"/>
-                    </TextBlock.Text>
-                </TextBlock>
+                    </TextBox.Text>
+                </TextBox>
                 <Separator Visibility="{Binding SelectedEntry, Converter={StaticResource NullToVisConverter}}"/>
 
                 <!-- Sections -->

@@ -143,10 +143,89 @@ namespace PowerTerminal
             OpenPanel(width);
         }
 
+        // ── Command Palette ───────────────────────────────────────────────────
+
+        private DateTime _lastCtrlPress = DateTime.MinValue;
+        private CommandPaletteWindow? _palette;
+
+        private void OpenCommandPalette()
+        {
+            if (_palette != null && _palette.IsLoaded) { _palette.Activate(); return; }
+
+            var activeTab = Vm.ActiveTerminalTab;
+
+            // Build system-vars dict from the active tab's machine info (empty if no connection)
+            var sysVars = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (activeTab?.MachineInfo != null)
+            {
+                var m = activeTab.MachineInfo;
+                void Add(string key, string? val) { if (!string.IsNullOrEmpty(val)) sysVars[key] = val!; }
+                Add("hostname",         m.Hostname);
+                Add("username",         m.Username);
+                Add("ipaddress",        m.IpAddress);
+                Add("homefolder",       m.HomeFolder);
+                Add("currentdirectory",m.CurrentDirectory);
+                Add("operatingsystem",  m.OperatingSystem);
+                Add("osversion",        m.OsVersion);
+                Add("kernelversion",    m.KernelVersion);
+                Add("defaultshell",     m.DefaultShell);
+                Add("timezone",         m.Timezone);
+                Add("cpucount",         m.CpuCount);
+                Add("freememory",       m.FreeMemory);
+                Add("freedisk",         m.FreeDisk);
+                Add("totalmemory",      m.TotalMemory);
+                Add("cpuinfo",          m.CpuInfo);
+                Add("publicip",         m.PublicIp);
+                Add("sudouser",         m.SudoUser);
+                Add("hardware",         m.Hardware);
+            }
+
+            var vm = new ViewModels.CommandPaletteViewModel(Vm.Config, sysVars);
+            _palette = new CommandPaletteWindow { DataContext = vm, Owner = this };
+            _palette.CommandSelected += cmd =>
+            {
+                _palette = null;
+                activeTab?.SendData(cmd);
+            };
+
+            void RecenterPalette(object? s, EventArgs e)
+            {
+                if (_palette == null || !_palette.IsLoaded) return;
+                _palette.Left = Left + (ActualWidth  - _palette.ActualWidth)  / 2;
+                _palette.Top  = Top  + (ActualHeight - _palette.ActualHeight) / 2;
+            }
+
+            LocationChanged += RecenterPalette;
+            SizeChanged     += RecenterPalette;
+
+            _palette.Closed += (_, _) =>
+            {
+                _palette = null;
+                LocationChanged -= RecenterPalette;
+                SizeChanged     -= RecenterPalette;
+            };
+
+            _palette.Show();
+        }
+
         // F1 generates a routed Help command that WPF processes via KeyDown tunnelling.
         // Intercept it here so it never fires, letting PreviewKeyDown in TerminalControl handle it.
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            // Double-Ctrl opens the command palette
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                var now = DateTime.UtcNow;
+                if ((now - _lastCtrlPress).TotalMilliseconds < 400)
+                {
+                    _lastCtrlPress = DateTime.MinValue;
+                    OpenCommandPalette();
+                    e.Handled = true;
+                    return;
+                }
+                _lastCtrlPress = now;
+            }
+
             if (e.Key == Key.F1 && FocusManager.GetFocusedElement(this) is TerminalControl)
             {
                 e.Handled = true;

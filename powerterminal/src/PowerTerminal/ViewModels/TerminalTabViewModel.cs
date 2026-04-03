@@ -152,8 +152,14 @@ namespace PowerTerminal.ViewModels
         public string CpuInfo           => MachineInfo?.CpuInfo           ?? string.Empty;
         public string TotalMemory       => MachineInfo?.TotalMemory       ?? string.Empty;
         public string Username          => MachineInfo?.Username          ?? string.Empty;
-        public string Uptime            => MachineInfo?.Uptime            ?? string.Empty;
         public string KernelVersion     => MachineInfo?.KernelVersion     ?? string.Empty;
+        public string DefaultShell      => MachineInfo?.DefaultShell      ?? string.Empty;
+        public string Timezone          => MachineInfo?.Timezone          ?? string.Empty;
+        public string CpuCount          => MachineInfo?.CpuCount          ?? string.Empty;
+        public string FreeMemory        => MachineInfo?.FreeMemory        ?? string.Empty;
+        public string FreeDisk          => MachineInfo?.FreeDisk          ?? string.Empty;
+        public string PublicIp          => MachineInfo?.PublicIp          ?? string.Empty;
+        public string SudoUser          => MachineInfo?.SudoUser          ?? string.Empty;
 
         public string? LogoPath => Connection?.LogoPath;
 

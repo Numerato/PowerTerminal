@@ -363,30 +363,97 @@
 
     <!-- TextBox dark style -->
     <Style TargetType="TextBox">
-        <Setter Property="Background"      Value="{StaticResource SurfaceBrush}"/>
-        <Setter Property="Foreground"      Value="{StaticResource ForegroundBrush}"/>
-        <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Height"          Value="28"/>
-        <Setter Property="Padding"         Value="2,2"/>
-        <Setter Property="FontFamily"      Value="Segoe UI, Arial"/>
-        <Setter Property="FontSize"        Value="13"/>
-        <Setter Property="CaretBrush"      Value="{StaticResource ForegroundBrush}"/>
-        <Setter Property="SelectionBrush"  Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="Background"             Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Foreground"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderBrush"            Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness"        Value="1"/>
+        <Setter Property="MinHeight"              Value="28"/>
+        <Setter Property="Padding"                Value="2,2"/>
+        <Setter Property="FontFamily"             Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"               Value="13"/>
+        <Setter Property="CaretBrush"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="SelectionBrush"         Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="SelectionTextBrush"     Value="{StaticResource ForegroundBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="3">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                            CornerRadius="3"
+                            MinHeight="{TemplateBinding MinHeight}">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Terminal-style prompt input: no box, only a thin bottom underline -->
+    <Style x:Key="PromptTextBox" TargetType="TextBox">
+        <Setter Property="Background"         Value="{StaticResource SurfaceHighBrush}"/>
+        <Setter Property="Foreground"         Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="BorderBrush"        Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderThickness"    Value="0,0,0,1"/>
+        <Setter Property="Padding"            Value="4,2"/>
+        <Setter Property="FontFamily"         Value="Cascadia Code, Consolas, Courier New"/>
+        <Setter Property="FontSize"           Value="12"/>
+        <Setter Property="CaretBrush"         Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="SelectionBrush"     Value="{StaticResource SelectionBrush}"/>
+        <Setter Property="SelectionTextBrush" Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="FocusVisualStyle"   Value="{x:Null}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="{TemplateBinding Padding}"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Selectable text: looks exactly like a TextBlock but supports Ctrl+A / Ctrl+C -->
+    <Style x:Key="SelectableText" TargetType="TextBox">
+        <Setter Property="IsReadOnly"             Value="True"/>
+        <Setter Property="Background"             Value="Transparent"/>
+        <Setter Property="BorderThickness"        Value="0"/>
+        <Setter Property="MinHeight"              Value="0"/>
+        <Setter Property="Padding"                Value="0"/>
+        <Setter Property="Margin"                 Value="0"/>
+        <Setter Property="VerticalAlignment"      Value="Center"/>
+        <Setter Property="FontFamily"             Value="Segoe UI, Arial"/>
+        <Setter Property="FontSize"               Value="13"/>
+        <Setter Property="Foreground"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="CaretBrush"             Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="SelectionBrush"         Value="{StaticResource AccentBrush}"/>
+        <Setter Property="SelectionTextBrush"     Value="White"/>
+        <Setter Property="FocusVisualStyle"       Value="{x:Null}"/>
+        <Setter Property="Cursor"                 Value="IBeam"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost"
+                                  Background="Transparent"
+                                  VerticalAlignment="{TemplateBinding VerticalAlignment}"
+                                  Margin="0"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
