@@ -28,5 +28,3 @@ desktop.ini
 *.swp
 *~
 
-# dotnet tools manifest (optional)
-.config/
