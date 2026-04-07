@@ -25,6 +25,10 @@ namespace PowerTerminal.Services
         private readonly LoggingService _log;
         private string _sessionName = string.Empty;
 
+        // Ensures Disconnected fires at most once per session (guards against
+        // the StartReading catch block and SshClient.ErrorOccurred both firing it).
+        private int _disconnectedFired = 0;
+
         // Output is held until all initialization is complete so the terminal
         // renders once cleanly instead of flashing during startup.
         private readonly List<byte[]> _heldOutput = new();
@@ -50,6 +54,13 @@ namespace PowerTerminal.Services
         /// <summary>Raised when the connection is lost (cleanly or with an error).</summary>
         public event EventHandler? Disconnected;
 
+        /// <summary>Fires Disconnected exactly once per session (thread-safe).</summary>
+        private void RaiseDisconnected()
+        {
+            if (Interlocked.CompareExchange(ref _disconnectedFired, 1, 0) == 0)
+                Disconnected?.Invoke(this, EventArgs.Empty);
+        }
+
         /// <summary>
         /// Optional callback to write status text directly into the terminal
         /// (e.g. "Connection failed: ..."). Called from the SSH background thread.
@@ -72,6 +83,8 @@ namespace PowerTerminal.Services
             CancellationToken ct = default)
         {
             Disconnect();
+            // Reset the dedup flag so Disconnected can fire again for the new session.
+            Interlocked.Exchange(ref _disconnectedFired, 0);
 
             var connection = new SshConnection
             {
@@ -112,7 +125,7 @@ namespace PowerTerminal.Services
                     {
                         _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
                         ErrorOccurred?.Invoke(this, e.Exception?.Message ?? "Unknown error");
-                        Disconnected?.Invoke(this, EventArgs.Empty);
+                        RaiseDisconnected();
                     };
 
                     try
@@ -159,7 +172,7 @@ namespace PowerTerminal.Services
                         {
                             _log.LogTerminalEvent(_sessionName, $"SSH error: {e.Exception?.Message}");
                             ErrorOccurred?.Invoke(this, e.Exception?.Message ?? "Unknown error");
-                            Disconnected?.Invoke(this, EventArgs.Empty);
+                            RaiseDisconnected();
                         };
 
                         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -306,14 +319,14 @@ namespace PowerTerminal.Services
                         if (!token.IsCancellationRequested)
                         {
                             ErrorOccurred?.Invoke(this, ex.Message);
-                            Disconnected?.Invoke(this, EventArgs.Empty);
+                            RaiseDisconnected();
                         }
                         break;
                     }
                 }
 
                 if (!token.IsCancellationRequested)
-                    Disconnected?.Invoke(this, EventArgs.Empty);
+                    RaiseDisconnected();
             }, token);
         }
 
@@ -540,23 +553,35 @@ namespace PowerTerminal.Services
 
         public void Disconnect()
         {
-            // Capture first so a concurrent Disconnect() can't race between
-            // Cancel() and Dispose() after _readCts is set to null.
+            // Capture and null out refs immediately so IsConnected returns false right away
+            // and no new data is sent/received.
             var cts = _readCts;
             _readCts = null;
             cts?.Cancel();
             cts?.Dispose();
-            try { _shellStream?.Dispose(); } catch { }
+
+            var stream = _shellStream;
+            var client = _client;
+            var log = _log;
+            var sessionName = _sessionName;
             _shellStream = null;
-            if (_client?.IsConnected == true)
-            {
-                try { _client.Disconnect(); } catch { }
-                _log.LogTerminalEvent(_sessionName, "Disconnected");
-            }
-            try { _client?.Dispose(); } catch { }
             _client = null;
             CurrentConnection = null;
             MachineInfo = null;
+
+            // Run blocking SSH teardown on a background thread so we never freeze the UI.
+            // When a server has rebooted the Dispose/Disconnect calls can block for the
+            // full TCP timeout (minutes) if done synchronously on the UI thread.
+            Task.Run(() =>
+            {
+                try { stream?.Dispose(); } catch { }
+                if (client?.IsConnected == true)
+                {
+                    try { client.Disconnect(); } catch { }
+                    try { log.LogTerminalEvent(sessionName, "Disconnected"); } catch { }
+                }
+                try { client?.Dispose(); } catch { }
+            });
         }
 
         public void Dispose() => Disconnect();

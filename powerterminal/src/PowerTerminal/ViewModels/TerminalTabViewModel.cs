@@ -94,9 +94,6 @@ namespace PowerTerminal.ViewModels
         /// <summary>Raised when connection state changes.</summary>
         public event Action? StateChanged;
 
-        /// <summary>Raised when a connected session ends and the tab should close.</summary>
-        public event Action? TabCloseRequested;
-
         // ── State properties ─────────────────────────────────────────────────
 
         public string Header
@@ -188,17 +185,18 @@ namespace PowerTerminal.ViewModels
 
             _ssh.Disconnected += (_, _) =>
             {
-                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                // Use BeginInvoke (non-blocking) to avoid deadlocking the SSH read thread.
+                // The tab stays open so the user can reconnect manually.
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
                 {
                     IsConnected = false;
                     StatusText  = "Disconnected";
-                    TabCloseRequested?.Invoke();
                 });
             };
 
             _ssh.ErrorOccurred += (_, msg) =>
             {
-                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
                     LocalOutput?.Invoke($"\r\n\x1b[91mSSH error: {msg}\x1b[0m\r\n"));
             };
 

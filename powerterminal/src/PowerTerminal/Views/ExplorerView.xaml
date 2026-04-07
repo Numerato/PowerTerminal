@@ -131,7 +131,8 @@
                                 <TextBox Style="{StaticResource SelectableText}"
                                          Text="{Binding Name, Mode=OneWay}"
                                          FontSize="13"
-                                         TextWrapping="NoWrap"/>
+                                         TextWrapping="NoWrap"
+                                         IsHitTestVisible="False"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
@@ -142,7 +143,8 @@
                                          Text="{Binding SizeDisplay, Mode=OneWay}"
                                          FontSize="12"
                                          Foreground="{StaticResource ForegroundDimBrush}"
-                                         HorizontalAlignment="Right"/>
+                                         HorizontalAlignment="Right"
+                                         IsHitTestVisible="False"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
@@ -152,7 +154,8 @@
                                 <TextBox Style="{StaticResource SelectableText}"
                                          Text="{Binding Modified, Mode=OneWay}"
                                          FontSize="12"
-                                         Foreground="{StaticResource ForegroundDimBrush}"/>
+                                         Foreground="{StaticResource ForegroundDimBrush}"
+                                         IsHitTestVisible="False"/>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>

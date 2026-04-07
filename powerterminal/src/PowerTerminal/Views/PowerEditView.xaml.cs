@@ -267,7 +267,9 @@ namespace PowerTerminal.Views
             int idx = -1;
             if (forward)
             {
-                idx = text.IndexOf(search, Math.Max(0, startFrom), comparison);
+                // Clamp to [0, text.Length] — cursor at end-of-document makes startFrom == text.Length+1
+                int from = Math.Clamp(startFrom, 0, text.Length);
+                idx = text.IndexOf(search, from, comparison);
                 if (idx < 0)
                     idx = text.IndexOf(search, 0, comparison);
             }

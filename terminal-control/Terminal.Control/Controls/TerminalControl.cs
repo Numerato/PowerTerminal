@@ -86,6 +86,7 @@ public sealed class TerminalControl : FrameworkElement
 
     private TerminalEmulator? _emulator;
     private ISshTerminalSession? _session;
+    private EventHandler<string>? _responseReadyHandler;
 
     private GlyphTypeface? _glyphTypeface;
     private GlyphTypeface? _boldGlyphTypeface;
@@ -163,7 +164,12 @@ public sealed class TerminalControl : FrameworkElement
             _emulator.BellRaised += (_, _) => System.Media.SystemSounds.Beep.Play();
             _emulator.CursorVisibilityChanged += (_, _) => QueueRender();
         }
-        _emulator.ResponseReady += (_, response) => _session?.Send(response);
+        // Remove the old ResponseReady handler before adding the new one to prevent
+        // duplicate sends when AttachSession is called multiple times (e.g. reconnect).
+        if (_responseReadyHandler != null)
+            _emulator.ResponseReady -= _responseReadyHandler;
+        _responseReadyHandler = (_, response) => _session?.Send(response);
+        _emulator.ResponseReady += _responseReadyHandler;
         _session.DataReceived += OnDataReceived;
         _session.Disconnected += OnDisconnected;
         _emulator.Buffer.MarkAllDirty();
@@ -547,7 +553,7 @@ public sealed class TerminalControl : FrameworkElement
         {
             if (_session?.IsConnected == true && Clipboard.ContainsText())
             {
-                string text = Clipboard.GetText();
+                string text = NormalizeNewlinesForPaste(Clipboard.GetText());
                 if (_emulator?.BracketedPaste == true)
                     _session.Send("\x1b[200~" + text + "\x1b[201~");
                 else
@@ -989,12 +995,26 @@ public sealed class TerminalControl : FrameworkElement
     {
         if (_session?.IsConnected == true && Clipboard.ContainsText())
         {
-            string text = Clipboard.GetText();
+            string text = NormalizeNewlinesForPaste(Clipboard.GetText());
             if (_emulator?.BracketedPaste == true)
                 _session.Send("\x1b[200~" + text + "\x1b[201~");
             else
                 _session.Send(text);
         }
+    }
+
+    /// <summary>
+    /// Normalises Windows clipboard line-endings for terminal paste.
+    /// Windows stores newlines as CR+LF (\r\n).  Sending both to a shell causes
+    /// the CR to submit the command and the dangling LF to inject a blank line.
+    /// Real terminal emulators (xterm, gnome-terminal …) convert every newline
+    /// sequence to a plain CR (\r) before writing to the pty, so we do the same:
+    /// strip the LF from CR+LF pairs, then convert any remaining bare LF to CR.
+    /// </summary>
+    private static string NormalizeNewlinesForPaste(string text)
+    {
+        // Replace \r\n → \r first, then any remaining bare \n → \r
+        return text.Replace("\r\n", "\r").Replace("\n", "\r");
     }
 
     public event EventHandler? ScrollbackChanged;

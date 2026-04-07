@@ -9,6 +9,9 @@ public sealed class SshTerminalSession : ISshTerminalSession
     private ShellStream? _stream;
     private CancellationTokenSource? _readCts;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    // Guards against Disconnected firing twice (once from the exception handler,
+    // once from the finally block) when the remote end drops unexpectedly.
+    private int _disconnectedFired = 0;
 
     public event EventHandler<byte[]>? DataReceived;
     public event EventHandler<string>? ErrorOccurred;
@@ -107,7 +110,9 @@ public sealed class SshTerminalSession : ISshTerminalSession
         }
         finally
         {
-            Disconnected?.Invoke(this, EventArgs.Empty);
+            // Fire Disconnected at most once, whether due to an error or intentional cancel.
+            if (Interlocked.CompareExchange(ref _disconnectedFired, 1, 0) == 0)
+                Disconnected?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -155,14 +160,29 @@ public sealed class SshTerminalSession : ISshTerminalSession
 
     public void Disconnect()
     {
-        _readCts?.Cancel();
-        _readCts?.Dispose();
+        // Reset so the read-loop finally block can fire Disconnected once more
+        // (shows "[Disconnected]" in the terminal on intentional disconnect).
+        Interlocked.Exchange(ref _disconnectedFired, 0);
+
+        var cts = _readCts;
         _readCts = null;
-        try { _stream?.Dispose(); } catch { }
-        try { _client?.Disconnect(); } catch { }
-        try { _client?.Dispose(); } catch { }
+        cts?.Cancel();
+        cts?.Dispose();
+
+        // Capture refs and null them immediately so IsConnected returns false at once.
+        var stream = _stream;
+        var client = _client;
         _stream = null;
         _client = null;
+
+        // Blocking SSH teardown goes to a background thread so the UI (or caller)
+        // is never frozen waiting for TCP timeouts on a dead server.
+        Task.Run(() =>
+        {
+            try { stream?.Dispose(); } catch { }
+            try { client?.Disconnect(); } catch { }
+            try { client?.Dispose(); } catch { }
+        });
     }
 
     public void Dispose() => Disconnect();

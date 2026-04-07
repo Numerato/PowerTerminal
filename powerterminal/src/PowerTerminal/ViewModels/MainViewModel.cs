@@ -190,9 +190,8 @@ namespace PowerTerminal.ViewModels
         }
 
         /// <summary>
-        /// Creates a new tab for <paramref name="conn"/>, auto-connects on first load,
-        /// and wires <see cref="TerminalTabViewModel.TabCloseRequested"/> to remove the tab
-        /// when the SSH session ends.
+        /// Creates a new tab for <paramref name="conn"/> and auto-connects on first load.
+        /// When the session drops, the tab stays open so the user can reconnect.
         /// </summary>
         public void ConnectToConnection(SshConnection conn)
         {
@@ -209,7 +208,6 @@ namespace PowerTerminal.ViewModels
                 // InlinePasswordCollector is wired by TerminalTabView.OnDataContextChanged
                 // when the tab's view is created — no popup dialog needed.
             };
-            tab.TabCloseRequested += () => RemoveTab(tab);
             TerminalTabs.Add(tab);
             ActiveTerminalTab = tab;
         }
